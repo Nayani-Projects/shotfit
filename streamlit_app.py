@@ -23,6 +23,8 @@ st.markdown(
     [data-testid="stMetricLabel"] {color: #687386;}
     .shotfit-kicker {text-transform: uppercase; letter-spacing: .12em; color: #687386; font-size: .78rem;}
     .shotfit-lead {font-size: 1.12rem; max-width: 820px; color: #364153;}
+    .shotfit-intro {background: #f4f7fb; border-left: 4px solid #1d428a; border-radius: .55rem; padding: 1rem 1.15rem; margin-bottom: 1.2rem; color: #293548;}
+    .shotfit-intro b {font-size: 1.05rem;}
     .shotfit-footer {border-top: 1px solid #e7eaf0; margin-top: 2rem; padding-top: 1rem; color: #687386; font-size: .82rem;}
     </style>
     """,
@@ -79,17 +81,28 @@ st.markdown(
 board_tab, brief_tab, model_tab = st.tabs(["Evidence Board", "Player Brief", "Model & Validation"])
 
 with board_tab:
-    st.header("Evidence Board")
-    st.caption(
-        f"All estimates below use only untouched {evaluation_season} shots. Labels reflect whether the entire 80% adjusted range is above, below, or crosses zero."
+    st.header("Players worth a closer look")
+    st.markdown(
+        f'<div class="shotfit-intro"><b>Find unusual shooting results from the {evaluation_season} season.</b><br>'
+        "ShotFit compares each player's makes with what an average NBA shooter would be expected to make from the same observable shot locations and situations.</div>",
+        unsafe_allow_html=True,
     )
+    st.caption("This is a screening tool—not a player ranking. Use it to identify results that deserve film, tracking, and scouting review.")
     positive_count = int(briefs.evidence_label.eq("Strong positive evidence").sum())
     inconclusive_count = int(briefs.evidence_label.eq("Inconclusive evidence").sum())
     negative_count = int(briefs.evidence_label.eq("Strong negative evidence").sum())
     p1, p2, p3 = st.columns(3)
-    p1.metric("Strong positive", positive_count)
-    p2.metric("Inconclusive", inconclusive_count)
-    p3.metric("Strong negative", negative_count)
+    p1.metric("Worth reviewing", positive_count, "Above expectation")
+    p2.metric("No clear signal", inconclusive_count, "Could be normal variation")
+    p3.metric("Potential concern", negative_count, "Below expectation")
+
+    with st.expander("What do these groups mean?"):
+        st.markdown(
+            "- **Worth reviewing:** shooting results were clearly above what the shot difficulty model expected.\n"
+            "- **No clear signal:** the available shots do not clearly separate performance from normal shooting variation.\n"
+            "- **Potential concern:** shooting results were clearly below what the model expected.\n\n"
+            "These groups describe shooting results, not overall player quality or future performance."
+        )
 
     f1, f2, f3, f4 = st.columns(4)
     with f1:
@@ -97,37 +110,58 @@ with board_tab:
     with f2:
         board_position = st.selectbox("Position", ["All positions", *sorted(briefs.position.unique())], key="board_position")
     with f3:
-        board_evidence = st.selectbox("Evidence", ["All evidence", "Strong positive evidence", "Inconclusive evidence", "Strong negative evidence"], key="board_evidence")
+        result_options = {
+            "All results": None,
+            "Outperformed expectations": "Strong positive evidence",
+            "No clear difference": "Inconclusive evidence",
+            "Underperformed expectations": "Strong negative evidence",
+        }
+        board_result = st.selectbox("Shooting result", list(result_options), key="board_result")
     with f4:
         board_profile = st.selectbox("Shot profile", ["All profiles", *sorted(briefs.shot_profile.unique())], key="board_profile")
-    s1, s2 = st.columns([1, 2])
-    with s1:
-        board_minimum = st.select_slider("Minimum attempts", options=[250, 400, 600, 800, 1000], value=250)
     sort_options = {
-        "Lower 80% bound": "lower_80",
-        "Adjusted extra makes per 100": "extra_makes_per_100",
-        "Total adjusted extra makes": "adjusted_extra_makes",
-        "Attempt volume": "attempts",
+        "Strongest evidence": ("lower_80", False),
+        "Most shots reviewed": ("attempts", False),
+        "Player name": ("player_name", True),
+        "Team": ("team_name", True),
     }
-    with s2:
-        board_sort = st.selectbox("Sort by", list(sort_options), key="board_sort")
+    board_minimum = 250
+    with st.expander("More filters"):
+        extra1, extra2 = st.columns(2)
+        with extra1:
+            board_minimum = st.select_slider("Minimum shots reviewed", options=[250, 400, 600, 800, 1000], value=250)
+        with extra2:
+            board_sort = st.selectbox("Sort by", list(sort_options), key="board_sort")
     board = briefs[briefs.attempts >= board_minimum].copy()
     if board_team != "All teams":
         board = board[board.team_name == board_team]
     if board_position != "All positions":
         board = board[board.position == board_position]
-    if board_evidence != "All evidence":
-        board = board[board.evidence_label == board_evidence]
+    if result_options[board_result] is not None:
+        board = board[board.evidence_label == result_options[board_result]]
     if board_profile != "All profiles":
         board = board[board.shot_profile == board_profile]
-    board = board.sort_values(sort_options[board_sort], ascending=False)
+    sort_column, sort_ascending = sort_options[board_sort]
+    board = board.sort_values(sort_column, ascending=sort_ascending)
+    public_result = {
+        "Strong positive evidence": "Worth reviewing",
+        "Inconclusive evidence": "No clear signal",
+        "Strong negative evidence": "Potential concern",
+    }
+    def board_reason(row):
+        if row.evidence_label == "Inconclusive evidence":
+            return f"No clear difference across {int(row.attempts):,} shots"
+        direction = "Above" if row.evidence_label == "Strong positive evidence" else "Below"
+        if row.strongest_supported_area != "No area with conclusive positive evidence":
+            return f"{direction} expectation; strongest support from {row.strongest_supported_area.lower()}"
+        return f"{direction} expectation on a {row.shot_profile.lower()} profile"
     board_display = board.assign(
-        range_80=board.apply(lambda row: f"{row.lower_80:+.1f} to {row.upper_80:+.1f}", axis=1),
-        extra_per_100=board.extra_makes_per_100.map(lambda value: f"{value:+.1f}"),
-    )[["player_name", "team_name", "position", "evidence_label", "extra_per_100", "range_80", "attempts", "shot_profile"]]
-    board_display.columns = ["Player", "Team", "Position", "Evidence", "Adjusted extra/100", "80% range", "Attempts", "Shot profile"]
+        result=board.evidence_label.map(public_result),
+        reason=board.apply(board_reason, axis=1),
+    )[["player_name", "team_name", "position", "reason", "attempts", "result"]]
+    board_display.columns = ["Player", "Team", "Position", "Why the player surfaced", "Shots reviewed", "Review group"]
     st.dataframe(board_display, hide_index=True, width="stretch", height=500)
-    st.caption(f"Showing {len(board_display):,} of {len(briefs):,} qualified players. Open Player Brief for the full evidence trail.")
+    st.caption(f"Showing {len(board_display):,} of {len(briefs):,} qualified players. Choose a player in Player Brief to see the full evidence trail and likely shooting range.")
 
 with brief_tab:
     st.header("Player Brief")
