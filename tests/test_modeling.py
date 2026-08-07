@@ -3,7 +3,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from shotfit.evaluation import empirical_bayes, role_for_player
+from shotfit.evaluation import empirical_bayes, evidence_label
 from shotfit.modeling import choose_model, expected_calibration_error
 
 
@@ -28,7 +28,12 @@ def test_empirical_bayes_shrinks_small_samples_more() -> None:
     assert (out.loc[1, "upper_80"] - out.loc[1, "lower_80"]) > (out.loc[2, "upper_80"] - out.loc[2, "lower_80"])
 
 
-def test_role_rule_returns_one_supported_label() -> None:
-    row = pd.Series({"rim_frequency": 0.1, "rim_extra": 0.2, "creator_frequency": 0.1, "extra_makes_per_100": 1.2, "three_frequency": 0.7, "corner_three_extra": 2.0, "above_break_extra": 1.0})
-    assert role_for_player(row)[0] == "Perimeter spacer"
-
+def test_evidence_labels_follow_interval_bounds() -> None:
+    intervals = pd.DataFrame(
+        {"lower_80": [0.1, -1.0, -3.0], "upper_80": [2.0, 2.0, -0.1]}
+    )
+    assert evidence_label(intervals).tolist() == [
+        "Strong positive evidence",
+        "Inconclusive evidence",
+        "Strong negative evidence",
+    ]

@@ -1,0 +1,60 @@
+{
+  "label_rule": "Strong positive when the entire 80% adjusted interval is above zero; strong negative when entirely below zero; otherwise inconclusive.",
+  "interval_level": "80%",
+  "minimum_attempts": 250,
+  "threshold_analysis": [
+    {
+      "minimum_attempts": 150,
+      "eligible_players": 363,
+      "median_interval_width": 4.559096694001264,
+      "conclusive_share": 0.36639118457300274,
+      "split_half_correlation": 0.5613077778670161,
+      "selected": false
+    },
+    {
+      "minimum_attempts": 250,
+      "eligible_players": 306,
+      "median_interval_width": 4.390371341861053,
+      "conclusive_share": 0.4084967320261438,
+      "split_half_correlation": 0.6216288059896615,
+      "selected": true
+    },
+    {
+      "minimum_attempts": 400,
+      "eligible_players": 232,
+      "median_interval_width": 4.173235507456006,
+      "conclusive_share": 0.4224137931034483,
+      "split_half_correlation": 0.6444736476542258,
+      "selected": false
+    },
+    {
+      "minimum_attempts": 600,
+      "eligible_players": 130,
+      "median_interval_width": 3.707546299775286,
+      "conclusive_share": 0.5076923076923077,
+      "split_half_correlation": 0.7105330162650272,
+      "selected": false
+    }
+  ],
+  "interval_sensitivity": [
+    {
+      "interval": "80%",
+      "strong_positive": 71,
+      "inconclusive": 185,
+      "strong_negative": 63
+    },
+    {
+      "interval": "90%",
+      "strong_positive": 44,
+      "inconclusive": 235,
+      "strong_negative": 40
+    },
+    {
+      "interval": "95%",
+      "strong_positive": 33,
+      "inconclusive": 261,
+      "strong_negative": 25
+    }
+  ],
+  "profile_rule": "Dominant shot-area frequency at or above the validation-season 75th percentile among players at the same position; otherwise balanced."
+}

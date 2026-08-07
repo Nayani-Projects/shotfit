@@ -1,4 +1,4 @@
-"""ShotFit public decision brief and model-validation application."""
+"""ShotFit 2025–26 shot-making evidence board."""
 
 from __future__ import annotations
 
@@ -13,23 +13,16 @@ from shotfit.court import shot_translation_court
 
 ROOT = Path(__file__).resolve().parent
 APP_DATA = ROOT / "data" / "app"
-FAMILY_COLUMNS = {
-    "At the rim": "rim_extra",
-    "Midrange": "midrange_extra",
-    "Corner three": "corner_three_extra",
-    "Above the break": "above_break_extra",
-}
 
 st.set_page_config(page_title="ShotFit", page_icon="🏀", layout="wide")
 st.markdown(
     """
     <style>
-    .block-container {max-width: 1080px; padding-top: 1.5rem;}
+    .block-container {max-width: 1120px; padding-top: 1.5rem;}
     [data-testid="stMetric"] {background: white; border: 1px solid #e7eaf0; padding: 1rem; border-radius: .8rem;}
     [data-testid="stMetricLabel"] {color: #687386;}
     .shotfit-kicker {text-transform: uppercase; letter-spacing: .12em; color: #687386; font-size: .78rem;}
-    .shotfit-lead {font-size: 1.12rem; max-width: 760px; color: #364153;}
-    .shotfit-role {border-left: 4px solid #1D428A; padding-left: 1rem;}
+    .shotfit-lead {font-size: 1.12rem; max-width: 820px; color: #364153;}
     .shotfit-footer {border-top: 1px solid #e7eaf0; margin-top: 2rem; padding-top: 1rem; color: #687386; font-size: .82rem;}
     </style>
     """,
@@ -39,120 +32,219 @@ st.markdown(
 
 @st.cache_data
 def load_data(bundle_signature: tuple[int, ...]):
-    required = ["player_briefs.parquet", "player_hex_bins.parquet", "validation_summary.json", "monitoring.json", "model_metadata.json"]
+    required = [
+        "player_briefs.parquet",
+        "player_areas.parquet",
+        "player_hex_bins.parquet",
+        "validation_summary.json",
+        "monitoring.json",
+        "model_metadata.json",
+        "evidence_standards.json",
+    ]
     missing = [name for name in required if not (APP_DATA / name).exists()]
     if missing:
         st.error(f"App bundle missing: {', '.join(missing)}. Run `uv run python -m shotfit.cli export-app`.")
         st.stop()
     briefs = pd.read_parquet(APP_DATA / "player_briefs.parquet")
+    areas = pd.read_parquet(APP_DATA / "player_areas.parquet")
     hex_bins = pd.read_parquet(APP_DATA / "player_hex_bins.parquet")
     metrics = json.loads((APP_DATA / "validation_summary.json").read_text())
     monitoring = json.loads((APP_DATA / "monitoring.json").read_text())
     metadata = json.loads((APP_DATA / "model_metadata.json").read_text())
-    return briefs, hex_bins, metrics, monitoring, metadata
+    standards = json.loads((APP_DATA / "evidence_standards.json").read_text())
+    return briefs, areas, hex_bins, metrics, monitoring, metadata, standards
 
 
-bundle_files = ["player_briefs.parquet", "player_hex_bins.parquet", "validation_summary.json", "monitoring.json", "model_metadata.json"]
+bundle_files = [
+    "player_briefs.parquet",
+    "player_areas.parquet",
+    "player_hex_bins.parquet",
+    "validation_summary.json",
+    "monitoring.json",
+    "model_metadata.json",
+    "evidence_standards.json",
+]
 bundle_signature = tuple((APP_DATA / name).stat().st_mtime_ns for name in bundle_files)
-briefs, hex_bins, metrics, monitoring, metadata = load_data(bundle_signature)
+briefs, areas, hex_bins, metrics, monitoring, metadata, standards = load_data(bundle_signature)
 evaluation_season = metadata["evaluation_season"]
-supporting_season = metadata["supporting_season"]
-st.markdown("### SHOTFIT")
-st.caption(f"Shooting translation brief · {evaluation_season} NBA regular season evaluation")
+validation_season = metadata["validation_season"]
 
-brief_tab, model_tab = st.tabs(["Basketball Brief", "Model & Validation"])
+st.markdown("### SHOTFIT")
+st.caption(f"{evaluation_season} shot-making evidence board · public NBA regular season data")
+st.markdown(
+    "Which players produced the strongest evidence of shot-making above or below expectation, "
+    "after accounting for where and how they shot?"
+)
+
+board_tab, brief_tab, model_tab = st.tabs(["Evidence Board", "Player Brief", "Model & Validation"])
+
+with board_tab:
+    st.header("Evidence Board")
+    st.caption(
+        f"All estimates below use only untouched {evaluation_season} shots. Labels reflect whether the entire 80% adjusted range is above, below, or crosses zero."
+    )
+    positive_count = int(briefs.evidence_label.eq("Strong positive evidence").sum())
+    inconclusive_count = int(briefs.evidence_label.eq("Inconclusive evidence").sum())
+    negative_count = int(briefs.evidence_label.eq("Strong negative evidence").sum())
+    p1, p2, p3 = st.columns(3)
+    p1.metric("Strong positive", positive_count)
+    p2.metric("Inconclusive", inconclusive_count)
+    p3.metric("Strong negative", negative_count)
+
+    f1, f2, f3, f4 = st.columns(4)
+    with f1:
+        board_team = st.selectbox("Team", ["All teams", *sorted(briefs.team_name.unique())], key="board_team")
+    with f2:
+        board_position = st.selectbox("Position", ["All positions", *sorted(briefs.position.unique())], key="board_position")
+    with f3:
+        board_evidence = st.selectbox("Evidence", ["All evidence", "Strong positive evidence", "Inconclusive evidence", "Strong negative evidence"], key="board_evidence")
+    with f4:
+        board_profile = st.selectbox("Shot profile", ["All profiles", *sorted(briefs.shot_profile.unique())], key="board_profile")
+    s1, s2 = st.columns([1, 2])
+    with s1:
+        board_minimum = st.select_slider("Minimum attempts", options=[250, 400, 600, 800, 1000], value=250)
+    sort_options = {
+        "Lower 80% bound": "lower_80",
+        "Adjusted extra makes per 100": "extra_makes_per_100",
+        "Total adjusted extra makes": "adjusted_extra_makes",
+        "Attempt volume": "attempts",
+    }
+    with s2:
+        board_sort = st.selectbox("Sort by", list(sort_options), key="board_sort")
+    board = briefs[briefs.attempts >= board_minimum].copy()
+    if board_team != "All teams":
+        board = board[board.team_name == board_team]
+    if board_position != "All positions":
+        board = board[board.position == board_position]
+    if board_evidence != "All evidence":
+        board = board[board.evidence_label == board_evidence]
+    if board_profile != "All profiles":
+        board = board[board.shot_profile == board_profile]
+    board = board.sort_values(sort_options[board_sort], ascending=False)
+    board_display = board.assign(
+        range_80=board.apply(lambda row: f"{row.lower_80:+.1f} to {row.upper_80:+.1f}", axis=1),
+        extra_per_100=board.extra_makes_per_100.map(lambda value: f"{value:+.1f}"),
+    )[["player_name", "team_name", "position", "evidence_label", "extra_per_100", "range_80", "attempts", "shot_profile"]]
+    board_display.columns = ["Player", "Team", "Position", "Evidence", "Adjusted extra/100", "80% range", "Attempts", "Shot profile"]
+    st.dataframe(board_display, hide_index=True, width="stretch", height=500)
+    st.caption(f"Showing {len(board_display):,} of {len(briefs):,} qualified players. Open Player Brief for the full evidence trail.")
 
 with brief_tab:
-    st.info(
-        f"Player estimates use {supporting_season} validation and {evaluation_season} evaluation shots. "
-        f"Public eligibility and the team shown below are based on the {evaluation_season} regular season."
-    )
+    st.header("Player Brief")
+    st.caption(f"Descriptive evidence from {evaluation_season} only—not a forecast, role recommendation, or acquisition grade.")
     filter_team, filter_position, filter_player = st.columns([1.2, 1, 1.5])
     with filter_team:
-        team = st.selectbox(f"Team ({evaluation_season})", ["All teams", *sorted(briefs.team_name.unique())])
+        team = st.selectbox("Team", ["All teams", *sorted(briefs.team_name.unique())], key="brief_team")
     team_pool = briefs if team == "All teams" else briefs[briefs.team_name == team]
     with filter_position:
-        position = st.selectbox("Position", ["All positions", *sorted(team_pool.position.unique())])
+        position = st.selectbox("Position", ["All positions", *sorted(team_pool.position.unique())], key="brief_position")
     player_pool = team_pool if position == "All positions" else team_pool[team_pool.position == position]
     with filter_player:
-        player = st.selectbox("Player", sorted(player_pool.player_name), index=0)
+        player = st.selectbox("Player", sorted(player_pool.player_name), key="brief_player")
     row = briefs.loc[briefs.player_name == player].iloc[0]
-    st.caption(f"{row.team_name} · {row.position} · {evaluation_season} evaluation season")
-    st.markdown('<div class="shotfit-kicker">Bottom line</div>', unsafe_allow_html=True)
-    st.header(row.bottom_line)
+    direction = f"{row.extra_makes_per_100:.1f} more" if row.extra_makes_per_100 >= 0 else f"{abs(row.extra_makes_per_100):.1f} fewer"
+    st.caption(f"{row.team_name} · {row.position} · {evaluation_season} regular season")
+    st.markdown('<div class="shotfit-kicker">Evidence summary</div>', unsafe_allow_html=True)
+    st.header(row.evidence_label)
     st.markdown(
-        f'<div class="shotfit-lead">{row.player_name} produced <b>{row.extra_makes_per_100:+.1f} extra makes per 100 shots</b> compared with an average shooter receiving the same observable public shot profile.</div>',
+        f'<div class="shotfit-lead">{row.player_name} made an adjusted <b>{direction} shots per 100 attempts</b> than expected from his observable {evaluation_season} shot profile. His 80% range was <b>{row.lower_80:+.1f} to {row.upper_80:+.1f}</b>.</div>',
         unsafe_allow_html=True,
     )
-    st.markdown(f"**{row.confidence}**")
-    left, middle, right = st.columns(3)
-    left.metric("Extra makes", f"{row.extra_makes_per_100:+.1f}", "per 100 shots")
-    middle.metric("Shots reviewed", f"{int(row.attempts):,}", f"across {int(row.seasons_reviewed)} out-of-sample seasons")
-    right.metric("Repeated across areas?", row.repeat_label, f"positive in {int(row.positive_families)} of 4")
-    st.subheader("Where the signal comes from")
+    m1, m2, m3 = st.columns(3)
+    m1.metric("Adjusted extra makes", f"{row.extra_makes_per_100:+.1f}", "per 100 shots")
+    m2.metric("80% adjusted range", f"{row.lower_80:+.1f} to {row.upper_80:+.1f}")
+    m3.metric("Shots reviewed", f"{int(row.attempts):,}", evaluation_season)
+    a1, a2, a3 = st.columns(3)
+    a1.metric("Actual makes", f"{int(row.actual_makes):,}")
+    a2.metric("Expected makes", f"{row.expected_makes:,.1f}")
+    a3.metric("Adjusted extra makes", f"{row.adjusted_extra_makes:+.1f}", "total")
+
+    st.subheader("Shot distribution")
+    st.markdown(f"**{row.shot_profile}** · {row.profile_statement}")
+    distribution = pd.DataFrame(
+        {
+            "Area": ["Rim", "Midrange", "Three-point"],
+            "Share of shots": [row.rim_share, row.midrange_share, row.three_share],
+            "Position percentile": [row.rim_percentile, row.midrange_percentile, row.three_percentile],
+        }
+    )
+    st.dataframe(distribution.style.format({"Share of shots": "{:.1%}", "Position percentile": "{:.0%}"}), hide_index=True, width="stretch")
+
+    st.subheader("Where the result came from")
     st.caption("Hex size shows shot volume. Blue locations finished above expectation; rust locations finished below expectation.")
     player_bins = hex_bins[hex_bins.player_id == row.player_id]
     st.plotly_chart(shot_translation_court(player_bins), width="stretch", config={"displayModeBar": False})
-    with st.expander("View shot-area values as a table"):
-        st.dataframe(
-            pd.DataFrame(
-                {
-                    "Shot area": list(FAMILY_COLUMNS),
-                    "Extra makes per 100": [float(row[column]) for column in FAMILY_COLUMNS.values()],
-                    "Shots": [int(row[f"{column.removesuffix('_extra')}_attempts"]) for column in FAMILY_COLUMNS.values()],
-                }
-            ).style.format({"Extra makes per 100": "{:+.1f}", "Shots": "{:,}"}),
-            hide_index=True,
-            width="stretch",
+    player_areas = areas[areas.player_id == row.player_id].copy().sort_values("attempts", ascending=False)
+    area_display = player_areas.assign(
+        range_80=player_areas.apply(lambda area: f"{area.lower_80:+.1f} to {area.upper_80:+.1f}", axis=1),
+        adjusted=player_areas.extra_makes_per_100.map(lambda value: f"{value:+.1f}"),
+    )[["shot_area", "attempts", "shot_share", "position_frequency_percentile", "actual_makes", "expected_makes", "adjusted", "range_80", "evidence_label"]]
+    area_display.columns = ["Shot area", "Attempts", "Shot share", "Position frequency percentile", "Actual makes", "Expected makes", "Adjusted extra/100", "80% range", "Evidence"]
+    st.dataframe(area_display.style.format({"Shot share": "{:.1%}", "Position frequency percentile": "{:.0%}", "Actual makes": "{:.0f}", "Expected makes": "{:.1f}"}), hide_index=True, width="stretch")
+    if row.strongest_supported_area != "No area with conclusive positive evidence":
+        st.success(f"Strongest supported area: {row.strongest_supported_area}.")
+    else:
+        st.info(row.strongest_supported_area + ".")
+    if row.review_flag != "No high-volume area had strong negative evidence.":
+        st.warning("Review flag: " + row.review_flag)
+    else:
+        st.caption(row.review_flag)
+    with st.expander("Limits of this evidence"):
+        st.write(
+            "Public shot records do not include shot-level defender distance, pass quality, movement, balance, screen quality, play design, health, or internal role information. "
+            "The estimates describe shot-making relative to observable context in this sample; they do not establish future performance, team fit, or what shots a player should take."
         )
-    st.caption(row.strongest_evidence)
-    role_col, next_col = st.columns(2, gap="large")
-    with role_col:
-        st.markdown('<div class="shotfit-role">', unsafe_allow_html=True)
-        st.subheader("Best-supported role to investigate")
-        st.markdown(f"**{row.role}**")
-        st.write(row.role_description)
-        st.markdown("</div>", unsafe_allow_html=True)
-    with next_col:
-        st.subheader("What staff should check next")
-        st.markdown("1. **Film:** Does the shot profile survive movement and tighter release windows?\n2. **Tracking:** How much comes from defender distance and pass quality?\n3. **Scouting:** Does the suggested role match his decisions and comfort?")
-    with st.expander("Confidence and limitations"):
-        st.write(f"**Likely range:** {row.lower_80:+.1f} to {row.upper_80:+.1f} extra makes per 100 shots")
-        st.write("Public shot records do not provide shot-level defender distance, pass quality, player balance, exact play design, health, or internal scouting context. Use this brief to focus film and tracking review—not as a final personnel grade.")
 
 with model_tab:
     st.header("Model & Validation")
-    st.write("ShotFit predicts whether an NBA field-goal attempt is made using only observable information available when the shot occurs. Player and team identity are excluded so the estimate represents an average shooter receiving the same public shot profile.")
+    st.subheader("Decision question")
+    st.write(
+        f"Which players produced the strongest evidence of shot-making above or below expectation in {evaluation_season}, and where did the difference originate?"
+    )
+    st.write(
+        "Expected makes are summed probabilities from a shot-context model that excludes player and team identity. Public player estimates use only the untouched test season."
+    )
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("Training", metrics["seasons"]["train"])
-    c2.metric("Validation", metrics["seasons"]["validation"])
-    c3.metric("Untouched test", metrics["seasons"]["test"])
+    c2.metric("Validation", validation_season)
+    c3.metric("Public evidence", evaluation_season)
     c4.metric("Selected model", "Logistic")
-    st.subheader("Does complexity earn its place?")
+
+    st.subheader("Model comparison")
     comparison = pd.DataFrame([{"Model": name, **values} for name, values in metrics["validation_models"].items()])
     st.dataframe(comparison.rename(columns={"log_loss": "Log loss", "brier_score": "Brier score", "roc_auc": "ROC AUC", "calibration_error": "Calibration error"}).style.format({"Log loss": "{:.4f}", "Brier score": "{:.4f}", "ROC AUC": "{:.4f}", "Calibration error": "{:.4f}"}), hide_index=True, width="stretch")
     st.caption(metrics["selection_rule"])
-    st.subheader(f"Untouched {evaluation_season} results")
     test = metrics["test_metrics"]
     t1, t2, t3, t4 = st.columns(4)
-    t1.metric("Log loss", f"{test['log_loss']:.4f}")
-    t2.metric("Brier score", f"{test['brier_score']:.4f}")
-    t3.metric("ROC AUC", f"{test['roc_auc']:.3f}")
+    t1.metric("Test log loss", f"{test['log_loss']:.4f}")
+    t2.metric("Test Brier score", f"{test['brier_score']:.4f}")
+    t3.metric("Test ROC AUC", f"{test['roc_auc']:.3f}")
     t4.metric("Calibration error", f"{test['calibration_error']:.3f}")
     calibration = pd.DataFrame(metrics["calibration"])
     line = alt.Chart(calibration).mark_line(point=True, color="#1D428A").encode(x=alt.X("predicted:Q", title="Predicted make probability", scale=alt.Scale(domain=[0.2, 0.8])), y=alt.Y("observed:Q", title="Observed make rate", scale=alt.Scale(domain=[0.2, 0.8])), tooltip=[alt.Tooltip("predicted:Q", format=".3f"), alt.Tooltip("observed:Q", format=".3f"), "shots:Q"])
     perfect = alt.Chart(pd.DataFrame({"x": [0.2, 0.8], "y": [0.2, 0.8]})).mark_line(strokeDash=[5, 5], color="#9AA3B2").encode(x="x:Q", y="y:Q")
-    st.altair_chart((perfect + line).properties(height=300), width="stretch")
+    st.altair_chart((perfect + line).properties(height=280), width="stretch")
+
+    st.subheader("Evidence standards")
+    st.write(standards["label_rule"])
+    st.caption(standards["profile_rule"])
+    threshold_table = pd.DataFrame(standards["threshold_analysis"]).rename(columns={"minimum_attempts": "Minimum attempts", "eligible_players": "Eligible players", "median_interval_width": "Median 80% width", "conclusive_share": "Conclusive share", "split_half_correlation": "Split-half correlation", "selected": "Selected"})
+    st.dataframe(threshold_table.style.format({"Median 80% width": "{:.2f}", "Conclusive share": "{:.1%}", "Split-half correlation": "{:.2f}"}), hide_index=True, width="stretch")
+    st.caption(f"The {metadata['minimum_test_attempts']}-attempt standard was selected on {validation_season} before applying labels to {evaluation_season}; it improves stability over 150 attempts while retaining substantially broader player coverage than 400 or 600.")
+    sensitivity = pd.DataFrame(standards["interval_sensitivity"]).rename(columns={"interval": "Interval", "strong_positive": "Strong positive", "inconclusive": "Inconclusive", "strong_negative": "Strong negative"})
+    st.dataframe(sensitivity, hide_index=True, width="stretch")
+    st.caption("The 80% interval is used for screening. The sensitivity table shows how classifications become more conservative at 90% and 95%.")
+
     st.subheader("Sample-size adjustment")
-    st.write("Small samples move toward the league average more strongly. Large samples retain more of the observed result. ShotFit reports the adjusted estimate and an 80% likely range rather than treating every hot or cold stretch as skill.")
-    st.subheader("Production flow")
-    st.code("nba_api → gzip raw cache → validated DuckDB → features → model → batch scores → app bundle", language=None)
+    st.write("Actual-minus-expected rates are stabilized with an empirical-Bayes normal-normal model. Lower-volume results move more toward zero and receive wider intervals; larger samples retain more of the observed difference.")
+    st.subheader("What ShotFit does not claim")
+    st.markdown("- It does not forecast next-season shooting.\n- It does not recommend a role, acquisition, or shot-selection change.\n- It does not measure defender distance, pass quality, movement, balance, play design, health, or internal scouting context.")
     st.subheader("Operations")
     o1, o2, o3 = st.columns(3)
     o1.metric("Model version", metadata["model_version"])
     o2.metric("Qualified players", metadata["qualified_players"])
     o3.metric("Drift status", monitoring["status"].title())
-    st.caption("The public app makes no runtime network calls. Drift is informational in v1; standardized feature shifts ≥0.20 or mean prediction shifts ≥0.03 trigger review.")
-    st.markdown("**Known limits:** no shot-level defender distance, pass quality, movement, balance, play design, medical context, or internal scouting data.")
+    st.code("nba_api → gzip raw cache → DuckDB → features → model → batch evidence → app", language=None)
+    st.caption("The public app loads only precomputed Parquet and JSON files and makes no runtime NBA.com requests.")
 
-st.markdown('<div class="shotfit-footer">Use with film, tracking, and scouting context · Decision support, not a final personnel grade</div>', unsafe_allow_html=True)
+st.markdown('<div class="shotfit-footer">Descriptive evidence for film and tracking review · Not a forecast, role recommendation, or personnel grade</div>', unsafe_allow_html=True)

@@ -1,10 +1,10 @@
-# ShotFit
+# ShotFit — 2025–26 Shot-Making Evidence Board
 
-ShotFit is a public-data NBA decision brief that asks:
+ShotFit asks one descriptive question:
 
-> Does this player's shooting appear likely to translate, where does the evidence come from, and what role should basketball staff investigate next?
+> Which NBA players produced the strongest evidence of shot-making above or below expectation in 2025–26, and where did the difference originate?
 
-The application leads with basketball language and keeps technical validation in a separate tab. Staff can narrow the 2025–26 player pool by team and primary roster position. ShotFit compares a zone baseline, logistic regression, and XGBoost with chronological validation, then stabilizes player results for sample size.
+The app compares actual makes with calibrated expected makes from the same observable public shot context, adjusts player and area results for sample size, and reports an 80% range. It does **not** forecast future shooting, recommend a role or acquisition, or prescribe shot selection.
 
 ## Quickstart
 
@@ -17,35 +17,38 @@ uv run python -m shotfit.cli export-app
 uv run streamlit run streamlit_app.py
 ```
 
-Or run the complete offline pipeline:
+Or run the complete offline pipeline with `uv run python -m shotfit.cli all`. On macOS, `run_local.command` starts the prebuilt app locally.
 
-```bash
-uv run python -m shotfit.cli all
-```
+## Analytical contract
 
-## Design principles
-
-- Team-batched API retrieval avoids the observed 102,400-row silent truncation.
-- Every response is cached and checksummed before transformation.
+- 2023–24 trains the shot-context model.
+- 2024–25 selects and calibrates the model and sets public evidence standards.
+- Untouched 2025–26 shots exclusively produce public player, area, and court results.
 - Player and team identity are excluded from shot difficulty.
-- 2025–26 is the untouched chronological test and public eligibility season; 2024–25 supplies supporting validation evidence.
-- The public app uses precomputed artifacts and makes no runtime network calls.
-- Automatic roles are descriptive scouting prompts, not causal projections.
+- Players need at least 250 test-season attempts.
+- Strong positive evidence requires the entire 80% adjusted range above zero.
+- Strong negative evidence requires the entire range below zero.
+- Every other result is inconclusive.
+- Shot-profile labels use validation-season positional frequency benchmarks, not performance.
+
+The 250-attempt standard was chosen before applying labels to 2025–26. On 2024–25 validation data it produced a 0.62 deterministic split-half correlation while retaining 306 players; higher thresholds improved stability but removed substantially more of the population.
+
+## App structure
+
+- **Evidence Board:** filter and compare all qualified players.
+- **Player Brief:** inspect the adjusted estimate, range, shot distribution, court map, area evidence, and review flags.
+- **Model & Validation:** audit model quality, calibration, threshold selection, interval sensitivity, and limitations.
 
 ## Repository map
 
-- `src/shotfit/`: ingestion, features, modeling, evaluation, and CLI
-- `streamlit_app.py`: Basketball Brief and Model & Validation tabs
-- `tests/`: deterministic unit and contract tests
+- `src/shotfit/`: ingestion, features, modeling, evidence generation, court rendering, and CLI
+- `data/app/`: compact precomputed Parquet and JSON bundle used at runtime
+- `tests/`: deterministic unit, contract, and artifact-reconciliation tests
 - `docs/`: architecture and data dictionary
-- `MODEL_CARD.md`: intended use, methodology, and limitations
+- `MODEL_CARD.md`: methodology, intended use, and limitations
 
-## Validation and limitations
+## Data policy and limitations
 
-The generated application reports real validation and untouched-test metrics after the pipeline runs. See [MODEL_CARD.md](MODEL_CARD.md) for the full methodology.
+Raw responses, DuckDB, and full shot-level files remain out of Git. The public app makes no runtime NBA.com calls.
 
-Public NBA shot records do not contain shot-level defender distance, pass quality, movement, balance, exact play design, health, or internal scouting context. ShotFit should be used with film, tracking, and scouting evidence.
-
-## Data policy
-
-Raw NBA responses, the local DuckDB database, and full shot-level feature files are not committed. The public repository contains reproducible ingestion code, schemas, tests, model metadata, and a compact derived app bundle. No OKC hiring-project material is used.
+Public shot records omit shot-level defender distance, pass quality, movement, balance, screen quality, play design, health, and internal role context. ShotFit describes performance relative to observable context in this sample; it does not establish future performance, team fit, or the shots a player should take. No OKC hiring-project material is used.

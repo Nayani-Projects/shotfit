@@ -1,6 +1,6 @@
 {
-  "model_version": "shotfit-2026-08-v2",
-  "created_at": "2026-08-07T15:10:20.347817+00:00",
+  "model_version": "shotfit-2026-08-v3",
+  "created_at": "2026-08-07T18:49:58.078359+00:00",
   "selected_model": "Logistic regression",
   "selection_rule": "XGBoost must improve validation log loss by 0.005 and Brier score by 0.001; otherwise prefer logistic regression.",
   "features": [
