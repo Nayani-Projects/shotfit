@@ -9,6 +9,8 @@ import altair as alt
 import pandas as pd
 import streamlit as st
 
+from shotfit.court import shot_translation_court
+
 ROOT = Path(__file__).resolve().parent
 APP_DATA = ROOT / "data" / "app"
 FAMILY_COLUMNS = {
@@ -87,20 +89,19 @@ with brief_tab:
     middle.metric("Shots reviewed", f"{int(row.attempts):,}", f"across {int(row.seasons_reviewed)} out-of-sample seasons")
     right.metric("Repeated across areas?", row.repeat_label, f"positive in {int(row.positive_families)} of 4")
     st.subheader("Where the signal comes from")
-    chart_data = pd.DataFrame({"Shot area": list(FAMILY_COLUMNS), "Extra makes per 100": [float(row[column]) for column in FAMILY_COLUMNS.values()]})
-    chart_data["Direction"] = chart_data["Extra makes per 100"].ge(0).map({True: "Better than expected", False: "Worse than expected"})
-    chart = (
-        alt.Chart(chart_data)
-        .mark_bar(cornerRadiusEnd=4)
-        .encode(
-            y=alt.Y("Shot area:N", sort=list(FAMILY_COLUMNS), title=None),
-            x=alt.X("Extra makes per 100:Q", title="Extra makes per 100 shots"),
-            color=alt.Color("Direction:N", scale=alt.Scale(domain=["Better than expected", "Worse than expected"], range=["#1D428A", "#C7CDD8"]), legend=None),
-            tooltip=["Shot area", alt.Tooltip("Extra makes per 100:Q", format="+.1f")],
+    st.plotly_chart(shot_translation_court(row), width="stretch", config={"displayModeBar": False})
+    with st.expander("View shot-area values as a table"):
+        st.dataframe(
+            pd.DataFrame(
+                {
+                    "Shot area": list(FAMILY_COLUMNS),
+                    "Extra makes per 100": [float(row[column]) for column in FAMILY_COLUMNS.values()],
+                    "Shots": [int(row[f"{column.removesuffix('_extra')}_attempts"]) for column in FAMILY_COLUMNS.values()],
+                }
+            ).style.format({"Extra makes per 100": "{:+.1f}", "Shots": "{:,}"}),
+            hide_index=True,
+            width="stretch",
         )
-    )
-    labels = alt.Chart(chart_data).mark_text(align="left", dx=5).encode(y=alt.Y("Shot area:N", sort=list(FAMILY_COLUMNS)), x="Extra makes per 100:Q", text=alt.Text("Extra makes per 100:Q", format="+.1f"))
-    st.altair_chart((chart + labels).properties(height=230), width="stretch")
     st.caption(row.strongest_evidence)
     role_col, next_col = st.columns(2, gap="large")
     with role_col:

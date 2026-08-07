@@ -12,6 +12,7 @@ dependencies = [
   "numpy>=2.1",
   "pandas>=2.2",
   "pyarrow>=19",
+  "plotly>=6.0",
   "scikit-learn>=1.6",
   "streamlit>=1.45",
   "xgboost>=3.0",

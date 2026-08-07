@@ -21,6 +21,14 @@ from shotfit.rosters import POSITION_OVERRIDES
 
 FAMILIES = ("At the rim", "Midrange", "Corner three", "Above the break")
 FAMILY_SLUG = {"At the rim": "rim", "Midrange": "midrange", "Corner three": "corner_three", "Above the break": "above_break"}
+COURT_ZONES = ("At the rim", "Midrange", "Left corner three", "Right corner three", "Above the break")
+COURT_ZONE_SLUG = {
+    "At the rim": "court_rim",
+    "Midrange": "court_midrange",
+    "Left corner three": "left_corner",
+    "Right corner three": "right_corner",
+    "Above the break": "court_above_break",
+}
 
 
 def empirical_bayes(frame: pd.DataFrame, group_columns: list[str]) -> pd.DataFrame:
@@ -103,6 +111,27 @@ def build_player_briefs(scored: pd.DataFrame) -> pd.DataFrame:
     family_wide = family_wide.rename(columns={family: f"{FAMILY_SLUG[family]}_extra" for family in FAMILIES})
     family_attempts = family_attempts.rename(columns={family: f"{FAMILY_SLUG[family]}_attempts" for family in FAMILIES})
     briefs = overall.merge(family_wide, on=["player_id", "player_name"]).merge(family_attempts, on=["player_id", "player_name"])
+    corner_side = np.select(
+        [
+            scored.shot_family.eq("Corner three") & scored.shot_zone_area.str.contains("Left", case=False, na=False),
+            scored.shot_family.eq("Corner three") & scored.shot_zone_area.str.contains("Right", case=False, na=False),
+        ],
+        ["Left corner three", "Right corner three"],
+        default=scored.shot_family,
+    )
+    court = empirical_bayes(scored.assign(court_zone=corner_side), ["player_id", "player_name", "court_zone"])
+    court_values = court.pivot(index=["player_id", "player_name"], columns="court_zone", values="extra_makes_per_100").reset_index()
+    court_attempts = court.pivot(index=["player_id", "player_name"], columns="court_zone", values="attempts").reset_index()
+    for zone in COURT_ZONES:
+        if zone not in court_values:
+            court_values[zone] = 0.0
+        if zone not in court_attempts:
+            court_attempts[zone] = 0
+    court_values[list(COURT_ZONES)] = court_values[list(COURT_ZONES)].fillna(0.0)
+    court_attempts[list(COURT_ZONES)] = court_attempts[list(COURT_ZONES)].fillna(0).astype(int)
+    court_values = court_values.rename(columns={zone: f"{COURT_ZONE_SLUG[zone]}_extra" for zone in COURT_ZONES})
+    court_attempts = court_attempts.rename(columns={zone: f"{COURT_ZONE_SLUG[zone]}_attempts" for zone in COURT_ZONES})
+    briefs = briefs.merge(court_values, on=["player_id", "player_name"]).merge(court_attempts, on=["player_id", "player_name"])
     test_counts = scored[scored.season == TEST_SEASON].groupby("player_id").size().rename("test_attempts")
     seasons = scored.groupby("player_id").season.nunique().rename("seasons_reviewed")
     creator = scored.assign(is_creator=scored.action_group.eq("pull_up_or_step_back")).groupby("player_id").is_creator.mean().rename("creator_frequency")
@@ -130,6 +159,8 @@ def build_player_briefs(scored: pd.DataFrame) -> pd.DataFrame:
         "player_id", "player_name", "team_id", "team_name", "position", "attempts", "test_attempts", "seasons_reviewed", "extra_makes_per_100", "lower_80", "upper_80", "confidence", "bottom_line", "positive_families", "repeat_label", "role", "role_description", "strongest_evidence",
         *[f"{FAMILY_SLUG[f]}_extra" for f in FAMILIES],
         *[f"{FAMILY_SLUG[f]}_attempts" for f in FAMILIES],
+        *[f"{COURT_ZONE_SLUG[z]}_extra" for z in COURT_ZONES],
+        *[f"{COURT_ZONE_SLUG[z]}_attempts" for z in COURT_ZONES],
     ]
     return briefs[keep].sort_values("extra_makes_per_100", ascending=False).reset_index(drop=True)
 
