@@ -55,11 +55,18 @@ def shot_translation_court(bins: pd.DataFrame) -> go.Figure:
                     "outlinewidth": 0,
                 },
             },
-            customdata=np.column_stack([bins.attempts, bins.actual_makes, bins.expected_makes]),
+            customdata=np.column_stack(
+                [
+                    bins.attempts,
+                    bins.actual_makes,
+                    bins.expected_makes,
+                    bins.extra_makes_per_100,
+                ]
+            ),
             hovertemplate=(
                 "<b>%{customdata[0]:,.0f} shots</b><br>"
-                "%{marker.color:+.1f} extra makes per 100<br>"
-                "%{customdata[1]:.0f} actual · %{customdata[2]:.1f} expected<extra></extra>"
+                "%{customdata[3]:+.1f} extra makes per 100<br>"
+                "%{customdata[1]:.0f} actual, %{customdata[2]:.1f} expected<extra></extra>"
             ),
             showlegend=False,
         )

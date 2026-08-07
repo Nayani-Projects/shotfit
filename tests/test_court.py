@@ -19,4 +19,6 @@ def test_court_renders_volume_and_efficiency_hexes() -> None:
     figure = shot_translation_court(bins)
     assert figure.data[0].marker.symbol == "hexagon"
     assert figure.data[0].marker.size[0] > figure.data[0].marker.size[1]
+    assert "%{customdata[3]:+.1f}" in figure.data[0].hovertemplate
+    assert figure.data[0].customdata[0][3] == 8.0
     assert figure.layout.yaxis.scaleanchor == "x"
