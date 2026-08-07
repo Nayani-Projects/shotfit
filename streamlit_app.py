@@ -130,11 +130,14 @@ def area_note(area, main_area):
 
 with review_tab:
     st.header("Player review")
-    st.caption("Select a player to see what happened, where it happened, and what to check on film.")
+    st.caption(
+        "Select a player to see what happened, where it happened, and what to check on film. "
+        "Results cover the full 2025-26 regular season. Team means the player's final team that season."
+    )
     filter_team, filter_position, filter_result, filter_player = st.columns([1.15, 1, 1.25, 1.5])
     with filter_team:
-        team = st.selectbox("Team", ["All teams", *sorted(briefs.team_name.unique())], key="brief_team")
-    team_pool = briefs if team == "All teams" else briefs[briefs.team_name == team]
+        team = st.selectbox("Final 2025-26 team", ["All final teams", *sorted(briefs.team_name.unique())], key="brief_team")
+    team_pool = briefs if team == "All final teams" else briefs[briefs.team_name == team]
     with filter_position:
         position = st.selectbox("Position", ["All positions", *sorted(team_pool.position.unique())], key="brief_position")
     position_pool = team_pool if position == "All positions" else team_pool[team_pool.position == position]
@@ -152,10 +155,6 @@ with review_tab:
     with filter_player:
         player = st.selectbox("Player", player_pool.player_name.tolist(), key="brief_player")
     st.caption(f"{len(player_pool):,} players match these filters.")
-    with st.expander("Browse matching players"):
-        browse = player_pool[["player_name", "team_name", "position", "attempts"]].copy()
-        browse.columns = ["Player", "Team", "Position", "Shots reviewed"]
-        st.dataframe(browse, hide_index=True, width="stretch", height=260)
 
     row = briefs.loc[briefs.player_name == player].iloc[0]
     direction = f"{row.extra_makes_per_100:.1f} more" if row.extra_makes_per_100 >= 0 else f"{abs(row.extra_makes_per_100):.1f} fewer"
@@ -183,8 +182,12 @@ with review_tab:
     )
     m1, m2, m3 = st.columns(3)
     m1.metric("Shooting difference", f"{row.extra_makes_per_100:+.1f}", "makes per 100 shots")
-    m2.metric("Shots reviewed", f"{int(row.attempts):,}", evaluation_season)
+    m2.metric("Season shots reviewed", f"{int(row.attempts):,}", evaluation_season)
     m3.metric("Main source", main_area, "shot area")
+    if row.teams_represented > 1:
+        st.caption(f"Full-season team breakdown: {row.team_breakdown} shots.")
+    else:
+        st.caption(f"All reviewed shots were taken with the {row.team_name}.")
 
     st.subheader("Where the result came from")
     st.caption("Larger markers represent more shots. Blue areas finished above expectation. Orange areas finished below expectation.")

@@ -107,6 +107,27 @@ def _shot_shares(frame: pd.DataFrame) -> pd.DataFrame:
     return summary
 
 
+def _team_history(test: pd.DataFrame) -> pd.DataFrame:
+    stints = (
+        test.groupby(["player_id", "team_name"], as_index=False)
+        .agg(team_attempts=("shot_made", "size"))
+        .sort_values(["player_id", "team_attempts", "team_name"], ascending=[True, False, True])
+    )
+    histories = []
+    for player_id, player_stints in stints.groupby("player_id", sort=False):
+        histories.append(
+            {
+                "player_id": player_id,
+                "teams_represented": int(len(player_stints)),
+                "team_breakdown": ", ".join(
+                    f"{row.team_name}: {int(row.team_attempts):,}"
+                    for row in player_stints.itertuples()
+                ),
+            }
+        )
+    return pd.DataFrame(histories)
+
+
 def _profile_percentiles(test_shares: pd.DataFrame, validation_shares: pd.DataFrame) -> pd.DataFrame:
     result = test_shares.copy()
     for area in PROFILE_AREAS:
@@ -149,8 +170,10 @@ def build_player_briefs(scored: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFram
     test = scored[scored.split == "test"].copy()
     validation = scored[scored.split == "validation"].copy()
     roster = _roster(test)
+    team_history = _team_history(test)
     overall = empirical_bayes(test, ["player_id"])
     overall = overall[overall.attempts >= MIN_TEST_ATTEMPTS].copy().merge(roster, on="player_id", how="left")
+    overall = overall.merge(team_history, on="player_id", how="left")
     overall["evidence_label"] = evidence_label(overall)
     test_shares = _shot_shares(test).merge(overall[["player_id", "position"]], on="player_id")
     eligible_validation = validation[validation.player_id.isin(overall.player_id)]
@@ -185,7 +208,7 @@ def build_player_briefs(scored: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFram
         axis=1,
     )
     keep = [
-        "player_id", "player_name", "team_id", "team_name", "position", "attempts", "actual_makes", "expected_makes", "raw_extra_makes", "adjusted_extra_makes", "extra_makes_per_100", "lower_80", "upper_80", "probability_positive", "evidence_label", "rim_share", "midrange_share", "three_share", "rim_percentile", "midrange_percentile", "three_percentile", "shot_profile", "profile_statement", "strongest_supported_area", "review_flag",
+        "player_id", "player_name", "team_id", "team_name", "position", "teams_represented", "team_breakdown", "attempts", "actual_makes", "expected_makes", "raw_extra_makes", "adjusted_extra_makes", "extra_makes_per_100", "lower_80", "upper_80", "probability_positive", "evidence_label", "rim_share", "midrange_share", "three_share", "rim_percentile", "midrange_percentile", "three_percentile", "shot_profile", "profile_statement", "strongest_supported_area", "review_flag",
     ]
     return overall[keep].sort_values("lower_80", ascending=False).reset_index(drop=True), areas
 

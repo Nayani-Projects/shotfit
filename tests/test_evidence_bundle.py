@@ -15,6 +15,8 @@ def test_public_bundle_follows_evidence_contract() -> None:
     assert briefs.attempts.min() >= 250
     assert "role" not in briefs.columns
     assert briefs.evidence_label.notna().all()
+    assert briefs.teams_represented.ge(1).all()
+    assert briefs.team_breakdown.str.len().gt(0).all()
     assert briefs.loc[briefs.evidence_label == "Strong positive evidence", "lower_80"].gt(0).all()
     assert briefs.loc[briefs.evidence_label == "Strong negative evidence", "upper_80"].lt(0).all()
     inconclusive = briefs[briefs.evidence_label == "Inconclusive evidence"]
