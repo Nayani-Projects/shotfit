@@ -19,8 +19,7 @@ def test_manifest_rejects_silent_cap(monkeypatch: pytest.MonkeyPatch) -> None:
     fake_teams = [{"abbreviation": f"T{i}"} for i in range(30)]
     monkeypatch.setattr("shotfit.ingest.teams.get_teams", lambda: fake_teams)
     rows = 102_400 // 30
-    manifest = [{"team": f"T{i}", "game_count": 82, "first_game_date": "20241022", "last_game_date": "20250413", "row_count": rows} for i in range(30)]
+    manifest = [{"team": f"T{i}", "game_count": 82, "first_game_date": "20251021", "last_game_date": "20260412", "row_count": rows} for i in range(30)]
     manifest[-1]["row_count"] += 102_400 - rows * 30
     with pytest.raises(ValueError, match="suspicious"):
-        validate_manifest(manifest, "2024-25")
-
+        validate_manifest(manifest, "2025-26")

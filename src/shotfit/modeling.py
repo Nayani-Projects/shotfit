@@ -168,7 +168,7 @@ def train_and_score(
     joblib.dump({"model": final_model, "calibrator": calibrator, "features": MODEL_FEATURES}, artifacts_dir / "shot_model.joblib")
     scored.to_parquet(processed_dir / "model_predictions.parquet", index=False)
     report = {
-        "model_version": "shotfit-2026-08-v1",
+        "model_version": "shotfit-2026-08-v2",
         "created_at": datetime.now(UTC).isoformat(),
         "selected_model": selected,
         "selection_rule": "XGBoost must improve validation log loss by 0.005 and Brier score by 0.001; otherwise prefer logistic regression.",

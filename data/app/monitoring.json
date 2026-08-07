@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-07T15:01:55.197348+00:00",
+  "generated_at": "2026-08-07T15:11:14.618749+00:00",
   "status": "stable",
   "thresholds": {
     "numeric_standardized_mean_shift": 0.2,
@@ -10,34 +10,34 @@
     "test": 0
   },
   "mean_prediction": {
-    "validation": 0.47434385002286245,
-    "test": 0.46983148896528276,
-    "absolute_shift": 0.0045123610575796835
+    "validation": 0.4672136001494121,
+    "test": 0.4686378628959743,
+    "absolute_shift": 0.0014242627465622104
   },
   "feature_drift": [
     {
       "feature": "shot_distance",
-      "standardized_mean_shift": 0.0441,
+      "standardized_mean_shift": 0.0179,
       "status": "stable"
     },
     {
       "feature": "loc_x",
-      "standardized_mean_shift": 0.0048,
+      "standardized_mean_shift": 0.0049,
       "status": "stable"
     },
     {
       "feature": "loc_y",
-      "standardized_mean_shift": 0.0341,
+      "standardized_mean_shift": 0.0194,
       "status": "stable"
     },
     {
       "feature": "shot_angle",
-      "standardized_mean_shift": 0.0054,
+      "standardized_mean_shift": 0.0029,
       "status": "stable"
     },
     {
       "feature": "seconds_remaining_period",
-      "standardized_mean_shift": 0.0024,
+      "standardized_mean_shift": 0.0059,
       "status": "stable"
     }
   ]

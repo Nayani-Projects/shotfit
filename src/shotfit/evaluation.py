@@ -17,6 +17,7 @@ from shotfit.config import (
     REFERENCE_DIR,
     TEST_SEASON,
 )
+from shotfit.rosters import POSITION_OVERRIDES
 
 FAMILIES = ("At the rim", "Midrange", "Corner three", "Above the break")
 FAMILY_SLUG = {"At the rim": "rim", "Midrange": "midrange", "Corner three": "corner_three", "Above the break": "above_break"}
@@ -116,7 +117,7 @@ def build_player_briefs(scored: pd.DataFrame) -> pd.DataFrame:
         raise FileNotFoundError("Player positions are missing. Run `python -m shotfit.cli fetch-rosters` first.")
     positions = pd.read_parquet(positions_path)[["player_id", "position"]]
     briefs = briefs.merge(latest_team, on="player_id", how="left").merge(positions, on="player_id", how="left")
-    briefs["position"] = briefs.position.fillna("Not listed")
+    briefs["position"] = briefs.position.fillna(briefs.player_id.map(POSITION_OVERRIDES)).fillna("Not listed")
     roles = briefs.apply(role_for_player, axis=1)
     briefs["role"] = [item[0] for item in roles]
     briefs["role_description"] = [item[1] for item in roles]

@@ -12,7 +12,12 @@ from shotfit.config import REFERENCE_DIR, TEST_SEASON
 
 POSITION_LABELS = {"G": "Guard", "F": "Forward", "C": "Center"}
 # Orlando Robinson appeared for Toronto but was absent from season-ending rosters.
-POSITION_OVERRIDES = {1631115: "Center"}
+POSITION_OVERRIDES = {
+    1631115: "Center",
+    1631093: "Guard",
+    1630560: "Guard",
+    1631246: "Guard",
+}
 
 
 def fetch_player_positions(season: str = TEST_SEASON) -> pd.DataFrame:

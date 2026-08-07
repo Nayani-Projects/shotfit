@@ -36,7 +36,7 @@ st.markdown(
 
 
 @st.cache_data
-def load_data():
+def load_data(bundle_signature: tuple[int, ...]):
     required = ["player_briefs.parquet", "validation_summary.json", "monitoring.json", "model_metadata.json"]
     missing = [name for name in required if not (APP_DATA / name).exists()]
     if missing:
@@ -49,20 +49,24 @@ def load_data():
     return briefs, metrics, monitoring, metadata
 
 
-briefs, metrics, monitoring, metadata = load_data()
+bundle_files = ["player_briefs.parquet", "validation_summary.json", "monitoring.json", "model_metadata.json"]
+bundle_signature = tuple((APP_DATA / name).stat().st_mtime_ns for name in bundle_files)
+briefs, metrics, monitoring, metadata = load_data(bundle_signature)
+evaluation_season = metadata["evaluation_season"]
+supporting_season = metadata["supporting_season"]
 st.markdown("### SHOTFIT")
-st.caption("Shooting translation brief · 2024–25 NBA regular season evaluation")
+st.caption(f"Shooting translation brief · {evaluation_season} NBA regular season evaluation")
 
 brief_tab, model_tab = st.tabs(["Basketball Brief", "Model & Validation"])
 
 with brief_tab:
     st.info(
-        "Player estimates use 2023–24 validation and 2024–25 evaluation shots. "
-        "Public eligibility and the team shown below are based on the 2024–25 regular season."
+        f"Player estimates use {supporting_season} validation and {evaluation_season} evaluation shots. "
+        f"Public eligibility and the team shown below are based on the {evaluation_season} regular season."
     )
     filter_team, filter_position, filter_player = st.columns([1.2, 1, 1.5])
     with filter_team:
-        team = st.selectbox("Team (2024–25)", ["All teams", *sorted(briefs.team_name.unique())])
+        team = st.selectbox(f"Team ({evaluation_season})", ["All teams", *sorted(briefs.team_name.unique())])
     team_pool = briefs if team == "All teams" else briefs[briefs.team_name == team]
     with filter_position:
         position = st.selectbox("Position", ["All positions", *sorted(team_pool.position.unique())])
@@ -70,7 +74,7 @@ with brief_tab:
     with filter_player:
         player = st.selectbox("Player", sorted(player_pool.player_name), index=0)
     row = briefs.loc[briefs.player_name == player].iloc[0]
-    st.caption(f"{row.team_name} · {row.position} · 2024–25 evaluation season")
+    st.caption(f"{row.team_name} · {row.position} · {evaluation_season} evaluation season")
     st.markdown('<div class="shotfit-kicker">Bottom line</div>', unsafe_allow_html=True)
     st.header(row.bottom_line)
     st.markdown(
@@ -124,7 +128,7 @@ with model_tab:
     comparison = pd.DataFrame([{"Model": name, **values} for name, values in metrics["validation_models"].items()])
     st.dataframe(comparison.rename(columns={"log_loss": "Log loss", "brier_score": "Brier score", "roc_auc": "ROC AUC", "calibration_error": "Calibration error"}).style.format({"Log loss": "{:.4f}", "Brier score": "{:.4f}", "ROC AUC": "{:.4f}", "Calibration error": "{:.4f}"}), hide_index=True, width="stretch")
     st.caption(metrics["selection_rule"])
-    st.subheader("Untouched 2024–25 results")
+    st.subheader(f"Untouched {evaluation_season} results")
     test = metrics["test_metrics"]
     t1, t2, t3, t4 = st.columns(4)
     t1.metric("Log loss", f"{test['log_loss']:.4f}")

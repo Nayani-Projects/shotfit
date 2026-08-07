@@ -4,7 +4,7 @@ ShotFit is a public-data NBA decision brief that asks:
 
 > Does this player's shooting appear likely to translate, where does the evidence come from, and what role should basketball staff investigate next?
 
-The application leads with basketball language and keeps technical validation in a separate tab. Staff can narrow the 2024–25 player pool by team and primary roster position. ShotFit compares a zone baseline, logistic regression, and XGBoost with chronological validation, then stabilizes player results for sample size.
+The application leads with basketball language and keeps technical validation in a separate tab. Staff can narrow the 2025–26 player pool by team and primary roster position. ShotFit compares a zone baseline, logistic regression, and XGBoost with chronological validation, then stabilizes player results for sample size.
 
 ## Quickstart
 
@@ -28,7 +28,7 @@ uv run python -m shotfit.cli all
 - Team-batched API retrieval avoids the observed 102,400-row silent truncation.
 - Every response is cached and checksummed before transformation.
 - Player and team identity are excluded from shot difficulty.
-- 2024–25 is the untouched chronological test and public eligibility season; 2023–24 supplies supporting validation evidence.
+- 2025–26 is the untouched chronological test and public eligibility season; 2024–25 supplies supporting validation evidence.
 - The public app uses precomputed artifacts and makes no runtime network calls.
 - Automatic roles are descriptive scouting prompts, not causal projections.
 

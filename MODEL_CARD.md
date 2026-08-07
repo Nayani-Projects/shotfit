@@ -9,9 +9,9 @@ It is not a causal projection, acquisition grade, or substitute for team trackin
 ## Data and validation
 
 - Source: NBA.com public statistics accessed through `nba_api`
-- Train: 2022–23 regular season
-- Validation and calibration: 2023–24 regular season
-- Untouched test: 2024–25 regular season
+- Train: 2023–24 regular season
+- Validation and calibration: 2024–25 regular season
+- Untouched test: 2025–26 regular season
 - Unit: one field-goal attempt
 - Target: made or missed
 
@@ -28,4 +28,3 @@ Expected makes are summed model probabilities. Actual-minus-expected rates are s
 ## Limitations
 
 Public shot records omit shot-level defender distance, pass quality, movement, player balance, screen quality, exact play design, fatigue, health, and internal role information. Action labels are coarse. The automatic role is a transparent descriptive prompt, not an optimized or causal recommendation.
-
