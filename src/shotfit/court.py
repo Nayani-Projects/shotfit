@@ -1,91 +1,95 @@
-"""Basketball-native half-court visualization for player shot translation."""
+"""Basketball-native shot-location visualization."""
 
 from __future__ import annotations
 
 import math
 
+import numpy as np
+import pandas as pd
 import plotly.graph_objects as go
 
-ZONE_LAYOUT = {
-    "At the rim": {"value": "court_rim_extra", "attempts": "court_rim_attempts", "x": 0, "y": 5.2},
-    "Midrange": {"value": "court_midrange_extra", "attempts": "court_midrange_attempts", "x": 0, "y": 18},
-    "Left corner": {"value": "left_corner_extra", "attempts": "left_corner_attempts", "x": -23.3, "y": 7},
-    "Right corner": {"value": "right_corner_extra", "attempts": "right_corner_attempts", "x": 23.3, "y": 7},
-    "Above the break": {"value": "court_above_break_extra", "attempts": "court_above_break_attempts", "x": 0, "y": 33},
-}
+
+def _arc(cx: float, cy: float, radius: float, start: float, stop: float, points: int = 100):
+    angles = np.linspace(math.radians(start), math.radians(stop), points)
+    return cx + radius * np.cos(angles), cy + radius * np.sin(angles)
 
 
-def _fill(value: float) -> str:
-    opacity = min(0.38, 0.12 + abs(value) / 20)
-    color = "29, 66, 138" if value >= 0 else "190, 88, 70"
-    return f"rgba({color}, {opacity:.3f})"
+def _line_trace(x, y, width: float = 1.35) -> go.Scatter:
+    return go.Scatter(
+        x=x,
+        y=y,
+        mode="lines",
+        line={"color": "#647083", "width": width},
+        hoverinfo="skip",
+        showlegend=False,
+    )
 
 
-def _polygon_circle(cx: float, cy: float, radius: float, points: int = 40) -> tuple[list[float], list[float]]:
-    angles = [2 * math.pi * index / points for index in range(points + 1)]
-    return [cx + radius * math.cos(angle) for angle in angles], [cy + radius * math.sin(angle) for angle in angles]
-
-
-def shot_translation_court(row) -> go.Figure:
-    """Return a directly labeled half-court with five reliability-adjusted zones."""
+def shot_translation_court(bins: pd.DataFrame) -> go.Figure:
+    """Render volume-sized hexes colored by makes above/below expectation."""
+    bins = bins[bins.y_bin <= 35].copy()
     figure = go.Figure()
-    zone_polygons = {
-        "Above the break": ([-21.8, 21.8, 21.8, -21.8, -21.8], [24, 24, 43.5, 43.5, 24]),
-        "Midrange": ([-21.8, 21.8, 21.8, -21.8, -21.8], [10.5, 10.5, 23.5, 23.5, 10.5]),
-        "Left corner": ([-24.8, -22.1, -22.1, -24.8, -24.8], [0.2, 0.2, 14, 14, 0.2]),
-        "Right corner": ([22.1, 24.8, 24.8, 22.1, 22.1], [0.2, 0.2, 14, 14, 0.2]),
-        "At the rim": _polygon_circle(0, 5.2, 5.0),
-    }
-    for zone, (x_values, y_values) in zone_polygons.items():
-        value = float(row[ZONE_LAYOUT[zone]["value"]])
-        figure.add_trace(
-            go.Scatter(
-                x=x_values,
-                y=y_values,
-                mode="lines",
-                fill="toself",
-                fillcolor=_fill(value),
-                line={"color": "rgba(91, 101, 116, .35)", "width": 1},
-                hovertemplate=(
-                    f"<b>{zone}</b><br>{value:+.1f} extra makes per 100"
-                    f"<br>{int(row[ZONE_LAYOUT[zone]['attempts']]):,} shots<extra></extra>"
-                ),
-                showlegend=False,
-            )
+    max_attempts = max(float(bins.attempts.max()), 1.0)
+    sizes = 7 + 24 * np.power(bins.attempts / max_attempts, 0.6)
+    figure.add_trace(
+        go.Scatter(
+            x=bins.x_bin,
+            y=bins.y_bin,
+            mode="markers",
+            marker={
+                "symbol": "hexagon",
+                "size": sizes,
+                "color": bins.extra_makes_per_100.clip(-10, 10),
+                "cmin": -10,
+                "cmax": 10,
+                "cmid": 0,
+                "colorscale": [[0, "#B65345"], [0.5, "#E9EDF3"], [1, "#1D428A"]],
+                "line": {"color": "rgba(255,255,255,.8)", "width": 0.8},
+                "colorbar": {
+                    "title": {"text": "Extra makes<br>per 100", "side": "right"},
+                    "thickness": 12,
+                    "len": 0.44,
+                    "x": 1.01,
+                    "tickvals": [-10, 0, 10],
+                    "ticktext": ["−10", "0", "+10"],
+                    "outlinewidth": 0,
+                },
+            },
+            customdata=np.column_stack([bins.attempts, bins.actual_makes, bins.expected_makes]),
+            hovertemplate=(
+                "<b>%{customdata[0]:,.0f} shots</b><br>"
+                "%{marker.color:+.1f} extra makes per 100<br>"
+                "%{customdata[1]:.0f} actual · %{customdata[2]:.1f} expected<extra></extra>"
+            ),
+            showlegend=False,
         )
-    line_color = "rgba(72, 81, 94, .65)"
+    )
+
+    # Regulation NBA half-court geometry in feet, hoop centered at (0, 0).
+    figure.add_trace(_line_trace([-25, -25], [-4.75, 35.5], 1.7))
+    figure.add_trace(_line_trace([25, 25], [-4.75, 35.5], 1.7))
+    figure.add_trace(_line_trace([-25, 25], [-4.75, -4.75], 1.7))
+    figure.add_trace(_line_trace([-8, 8, 8, -8, -8], [-4.75, -4.75, 14.25, 14.25, -4.75]))
+    x, y = _arc(0, 14.25, 6, 0, 360)
+    figure.add_trace(_line_trace(x, y))
+    x, y = _arc(0, 0, 4, 0, 180)
+    figure.add_trace(_line_trace(x, y))
+    x, y = _arc(0, 0, 0.75, 0, 360)
+    figure.add_trace(_line_trace(x, y, 1.8))
+    figure.add_trace(_line_trace([-3, 3], [-1.25, -1.25], 1.8))
+    figure.add_trace(_line_trace([-22, -22], [-4.75, 9.25]))
+    figure.add_trace(_line_trace([22, 22], [-4.75, 9.25]))
+    angle = math.degrees(math.acos(22 / 23.75))
+    x, y = _arc(0, 0, 23.75, angle, 180 - angle)
+    figure.add_trace(_line_trace(x, y))
+
     figure.update_layout(
-        shapes=[
-            {"type": "rect", "x0": -25, "x1": 25, "y0": 0, "y1": 47, "line": {"color": line_color, "width": 2}},
-            {"type": "rect", "x0": -8, "x1": 8, "y0": 0, "y1": 19, "line": {"color": line_color, "width": 1}},
-            {"type": "circle", "x0": -6, "x1": 6, "y0": 13, "y1": 25, "line": {"color": line_color, "width": 1}},
-            {"type": "circle", "x0": -0.75, "x1": 0.75, "y0": 4.45, "y1": 5.95, "line": {"color": line_color, "width": 2}},
-            {"type": "line", "x0": -3, "x1": 3, "y0": 4, "y1": 4, "line": {"color": line_color, "width": 2}},
-            {"type": "line", "x0": -22, "x1": -22, "y0": 0, "y1": 14, "line": {"color": line_color, "width": 1}},
-            {"type": "line", "x0": 22, "x1": 22, "y0": 0, "y1": 14, "line": {"color": line_color, "width": 1}},
-            {"type": "path", "path": "M -22 14 C -20 29, -11 35, 0 35 C 11 35, 20 29, 22 14", "line": {"color": line_color, "width": 1}},
-        ],
-        annotations=[
-            {
-                "x": settings["x"],
-                "y": settings["y"],
-                "text": (
-                    f"<b>{zone.upper()}</b><br>"
-                    f"<span style='font-size:17px'>{float(row[settings['value']]):+.1f}</span><br>"
-                    f"{int(row[settings['attempts']]):,} shots"
-                ),
-                "showarrow": False,
-                "font": {"size": 11, "color": "#263244"},
-                "textangle": -90 if "corner" in zone.lower() else 0,
-            }
-            for zone, settings in ZONE_LAYOUT.items()
-        ],
-        xaxis={"range": [-26, 26], "visible": False, "fixedrange": True},
-        yaxis={"range": [-1, 48], "visible": False, "fixedrange": True, "scaleanchor": "x", "scaleratio": 1},
-        height=560,
-        margin={"l": 4, "r": 4, "t": 8, "b": 4},
-        paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(0,0,0,0)",
-        hoverlabel={"bgcolor": "white", "font": {"color": "#263244"}},
+        xaxis={"range": [-27, 28], "visible": False, "fixedrange": True},
+        yaxis={"range": [-5.5, 35.5], "visible": False, "fixedrange": True, "scaleanchor": "x", "scaleratio": 1},
+        height=500,
+        margin={"l": 8, "r": 78, "t": 4, "b": 4},
+        paper_bgcolor="#F7F8FA",
+        plot_bgcolor="#F7F8FA",
+        hoverlabel={"bgcolor": "white", "font": {"color": "#172033"}},
     )
     return figure

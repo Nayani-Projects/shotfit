@@ -39,21 +39,22 @@ st.markdown(
 
 @st.cache_data
 def load_data(bundle_signature: tuple[int, ...]):
-    required = ["player_briefs.parquet", "validation_summary.json", "monitoring.json", "model_metadata.json"]
+    required = ["player_briefs.parquet", "player_hex_bins.parquet", "validation_summary.json", "monitoring.json", "model_metadata.json"]
     missing = [name for name in required if not (APP_DATA / name).exists()]
     if missing:
         st.error(f"App bundle missing: {', '.join(missing)}. Run `uv run python -m shotfit.cli export-app`.")
         st.stop()
     briefs = pd.read_parquet(APP_DATA / "player_briefs.parquet")
+    hex_bins = pd.read_parquet(APP_DATA / "player_hex_bins.parquet")
     metrics = json.loads((APP_DATA / "validation_summary.json").read_text())
     monitoring = json.loads((APP_DATA / "monitoring.json").read_text())
     metadata = json.loads((APP_DATA / "model_metadata.json").read_text())
-    return briefs, metrics, monitoring, metadata
+    return briefs, hex_bins, metrics, monitoring, metadata
 
 
-bundle_files = ["player_briefs.parquet", "validation_summary.json", "monitoring.json", "model_metadata.json"]
+bundle_files = ["player_briefs.parquet", "player_hex_bins.parquet", "validation_summary.json", "monitoring.json", "model_metadata.json"]
 bundle_signature = tuple((APP_DATA / name).stat().st_mtime_ns for name in bundle_files)
-briefs, metrics, monitoring, metadata = load_data(bundle_signature)
+briefs, hex_bins, metrics, monitoring, metadata = load_data(bundle_signature)
 evaluation_season = metadata["evaluation_season"]
 supporting_season = metadata["supporting_season"]
 st.markdown("### SHOTFIT")
@@ -89,7 +90,9 @@ with brief_tab:
     middle.metric("Shots reviewed", f"{int(row.attempts):,}", f"across {int(row.seasons_reviewed)} out-of-sample seasons")
     right.metric("Repeated across areas?", row.repeat_label, f"positive in {int(row.positive_families)} of 4")
     st.subheader("Where the signal comes from")
-    st.plotly_chart(shot_translation_court(row), width="stretch", config={"displayModeBar": False})
+    st.caption("Hex size shows shot volume. Blue locations finished above expectation; rust locations finished below expectation.")
+    player_bins = hex_bins[hex_bins.player_id == row.player_id]
+    st.plotly_chart(shot_translation_court(player_bins), width="stretch", config={"displayModeBar": False})
     with st.expander("View shot-area values as a table"):
         st.dataframe(
             pd.DataFrame(

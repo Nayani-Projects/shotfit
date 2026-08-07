@@ -186,6 +186,20 @@ def monitoring_report(scored: pd.DataFrame) -> dict:
     }
 
 
+def build_player_hex_bins(scored: pd.DataFrame, player_ids: set[int]) -> pd.DataFrame:
+    """Aggregate compact 2.5-foot staggered location bins for the public app."""
+    shots = scored[scored.player_id.isin(player_ids)].copy()
+    shots["court_x"] = shots.loc_x / 10
+    shots["court_y"] = shots.loc_y / 10
+    shots = shots[shots.court_x.between(-25, 25) & shots.court_y.between(-4.75, 42.25)]
+    shots["x_index"] = (shots.court_x / 2.5).round().astype(int)
+    shots["x_bin"] = shots.x_index * 2.5
+    shots["y_bin"] = ((shots.court_y - (shots.x_index.mod(2) * 1.25)) / 2.5).round() * 2.5 + shots.x_index.mod(2) * 1.25
+    bins = empirical_bayes(shots, ["player_id", "x_bin", "y_bin"])
+    bins = bins[bins.attempts >= 3].copy()
+    return bins[["player_id", "x_bin", "y_bin", "attempts", "actual_makes", "expected_makes", "extra_makes_per_100"]]
+
+
 def export_app_bundle(
     prediction_path: Path = PROCESSED_DIR / "model_predictions.parquet",
     app_dir: Path = APP_DATA_DIR,
@@ -193,10 +207,12 @@ def export_app_bundle(
 ) -> tuple[pd.DataFrame, dict]:
     scored = pd.read_parquet(prediction_path)
     briefs = build_player_briefs(scored)
+    hex_bins = build_player_hex_bins(scored, set(briefs.player_id))
     monitoring = monitoring_report(scored)
     metrics = json.loads(metrics_path.read_text())
     app_dir.mkdir(parents=True, exist_ok=True)
     briefs.to_parquet(app_dir / "player_briefs.parquet", index=False)
+    hex_bins.to_parquet(app_dir / "player_hex_bins.parquet", index=False)
     (app_dir / "validation_summary.json").write_text(json.dumps(metrics, indent=2) + "\n")
     (app_dir / "monitoring.json").write_text(json.dumps(monitoring, indent=2) + "\n")
     metadata = {"model_version": metrics["model_version"], "created_at": metrics["created_at"], "qualified_players": int(len(briefs)), "minimum_test_attempts": MIN_TEST_ATTEMPTS, "evaluation_season": TEST_SEASON, "supporting_season": metrics["seasons"]["validation"], "runtime_network_calls": False}
