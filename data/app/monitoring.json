@@ -1,0 +1,44 @@
+{
+  "generated_at": "2026-08-07T04:07:32.338660+00:00",
+  "status": "stable",
+  "thresholds": {
+    "numeric_standardized_mean_shift": 0.2,
+    "mean_prediction_shift": 0.03
+  },
+  "missing_cells": {
+    "validation": 0,
+    "test": 0
+  },
+  "mean_prediction": {
+    "validation": 0.47434385002286245,
+    "test": 0.46983148896528276,
+    "absolute_shift": 0.0045123610575796835
+  },
+  "feature_drift": [
+    {
+      "feature": "shot_distance",
+      "standardized_mean_shift": 0.0441,
+      "status": "stable"
+    },
+    {
+      "feature": "loc_x",
+      "standardized_mean_shift": 0.0048,
+      "status": "stable"
+    },
+    {
+      "feature": "loc_y",
+      "standardized_mean_shift": 0.0341,
+      "status": "stable"
+    },
+    {
+      "feature": "shot_angle",
+      "standardized_mean_shift": 0.0054,
+      "status": "stable"
+    },
+    {
+      "feature": "seconds_remaining_period",
+      "standardized_mean_shift": 0.0024,
+      "status": "stable"
+    }
+  ]
+}

@@ -1,0 +1,151 @@
+{
+  "model_version": "shotfit-2026-08-v1",
+  "created_at": "2026-08-07T04:05:09.996603+00:00",
+  "selected_model": "Logistic regression",
+  "selection_rule": "XGBoost must improve validation log loss by 0.005 and Brier score by 0.001; otherwise prefer logistic regression.",
+  "features": [
+    "shot_distance",
+    "loc_x",
+    "loc_y",
+    "shot_angle",
+    "shot_value",
+    "is_corner_three",
+    "period",
+    "seconds_remaining_period",
+    "is_late_period",
+    "is_home",
+    "shot_zone_basic",
+    "shot_zone_area",
+    "shot_zone_range",
+    "action_group",
+    "shot_family"
+  ],
+  "excluded": [
+    "player identity",
+    "team identity",
+    "future statistics",
+    "post-shot events"
+  ],
+  "seasons": {
+    "train": "2022-23",
+    "validation": "2023-24",
+    "test": "2024-25"
+  },
+  "row_counts": {
+    "train": 217220,
+    "validation": 218700,
+    "test": 219527
+  },
+  "validation_models": {
+    "Zone average": {
+      "log_loss": 0.6467740455234567,
+      "brier_score": 0.2284052822358605,
+      "roc_auc": 0.6459915884919004,
+      "calibration_error": 0.003932510069439247
+    },
+    "Logistic regression": {
+      "log_loss": 0.6464987963744121,
+      "brier_score": 0.22840280463331747,
+      "roc_auc": 0.6476374128756572,
+      "calibration_error": 0.01379828540996327
+    },
+    "XGBoost": {
+      "log_loss": 0.641794741153717,
+      "brier_score": 0.226382315158844,
+      "roc_auc": 0.6533396742220632,
+      "calibration_error": 0.010278958885785271
+    }
+  },
+  "test_metrics": {
+    "log_loss": 0.6444699903636603,
+    "brier_score": 0.22735514634078266,
+    "roc_auc": 0.64820125469226,
+    "calibration_error": 0.004461910843626507
+  },
+  "calibration": [
+    {
+      "predicted": 0.337921,
+      "observed": 0.335239,
+      "shots": 32708
+    },
+    {
+      "predicted": 0.372647,
+      "observed": 0.366028,
+      "shots": 22348
+    },
+    {
+      "predicted": 0.381632,
+      "observed": 0.369487,
+      "shots": 30951
+    },
+    {
+      "predicted": 0.388709,
+      "observed": 0.389577,
+      "shots": 2744
+    },
+    {
+      "predicted": 0.404231,
+      "observed": 0.402184,
+      "shots": 24081
+    },
+    {
+      "predicted": 0.43602,
+      "observed": 0.437027,
+      "shots": 22573
+    },
+    {
+      "predicted": 0.45216,
+      "observed": 0.452604,
+      "shots": 18683
+    },
+    {
+      "predicted": 0.522969,
+      "observed": 0.530357,
+      "shots": 21593
+    },
+    {
+      "predicted": 0.64747,
+      "observed": 0.645611,
+      "shots": 30585
+    },
+    {
+      "predicted": 0.886956,
+      "observed": 0.883191,
+      "shots": 13261
+    }
+  ],
+  "subgroups": [
+    {
+      "group": "Above the break",
+      "shots": 68869,
+      "log_loss": 0.6444702351931725,
+      "brier_score": 0.226501311219913,
+      "roc_auc": 0.521601826672422,
+      "calibration_error": 0.011587281387764646
+    },
+    {
+      "group": "At the rim",
+      "shots": 69328,
+      "log_loss": 0.6066771701758301,
+      "brier_score": 0.21120030300964365,
+      "roc_auc": 0.6627219512062484,
+      "calibration_error": 0.0042293194485575406
+    },
+    {
+      "group": "Corner three",
+      "shots": 23585,
+      "log_loss": 0.667590172249748,
+      "brier_score": 0.23733297874075232,
+      "roc_auc": 0.5115762401419243,
+      "calibration_error": 0.005836582648200247
+    },
+    {
+      "group": "Midrange",
+      "shots": 57745,
+      "log_loss": 0.6804002750122848,
+      "brier_score": 0.2436935058913429,
+      "roc_auc": 0.5372164619641441,
+      "calibration_error": 0.004000708808843706
+    }
+  ]
+}
