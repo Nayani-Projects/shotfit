@@ -24,4 +24,5 @@
 - `extra_makes_per_100`: reliability-adjusted player residual rate
 - `lower_80`, `upper_80`: 80% posterior interval
 - `role`: descriptive role to investigate
-
+- `team_name`: player's latest team observed during the 2024–25 regular season; display/filter only
+- `position`: primary Guard, Forward, or Center label from public 2024–25 team rosters; display/filter only

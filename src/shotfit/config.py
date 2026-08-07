@@ -10,6 +10,7 @@ RAW_DIR = DATA_DIR / "raw" / "nba_stats" / "shotchartdetail"
 DB_PATH = DATA_DIR / "database" / "shotfit.duckdb"
 PROCESSED_DIR = DATA_DIR / "processed"
 APP_DATA_DIR = DATA_DIR / "app"
+REFERENCE_DIR = DATA_DIR / "reference"
 ARTIFACTS_DIR = ROOT / "artifacts"
 
 SEASONS = ("2022-23", "2023-24", "2024-25")
@@ -47,4 +48,3 @@ REQUIRED_COLUMNS = (
     "HTM",
     "VTM",
 )
-

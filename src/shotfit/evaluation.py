@@ -14,6 +14,7 @@ from shotfit.config import (
     ARTIFACTS_DIR,
     MIN_TEST_ATTEMPTS,
     PROCESSED_DIR,
+    REFERENCE_DIR,
     TEST_SEASON,
 )
 
@@ -108,6 +109,14 @@ def build_player_briefs(scored: pd.DataFrame) -> pd.DataFrame:
     threes = scored.assign(is_three=scored.shot_value.eq(3)).groupby("player_id").is_three.mean().rename("three_frequency")
     briefs = briefs.merge(test_counts, on="player_id").merge(seasons, on="player_id").merge(creator, on="player_id").merge(rim, on="player_id").merge(threes, on="player_id")
     briefs = briefs[briefs.test_attempts >= MIN_TEST_ATTEMPTS].copy()
+    test_shots = scored[scored.season == TEST_SEASON].sort_values(["game_date", "game_id", "game_event_id"])
+    latest_team = test_shots.drop_duplicates("player_id", keep="last")[["player_id", "team_id", "team_name"]]
+    positions_path = REFERENCE_DIR / f"player_positions_{TEST_SEASON.replace('-', '_')}.parquet"
+    if not positions_path.exists():
+        raise FileNotFoundError("Player positions are missing. Run `python -m shotfit.cli fetch-rosters` first.")
+    positions = pd.read_parquet(positions_path)[["player_id", "position"]]
+    briefs = briefs.merge(latest_team, on="player_id", how="left").merge(positions, on="player_id", how="left")
+    briefs["position"] = briefs.position.fillna("Not listed")
     roles = briefs.apply(role_for_player, axis=1)
     briefs["role"] = [item[0] for item in roles]
     briefs["role_description"] = [item[1] for item in roles]
@@ -117,7 +126,7 @@ def build_player_briefs(scored: pd.DataFrame) -> pd.DataFrame:
     briefs["positive_families"] = briefs[[f"{FAMILY_SLUG[f]}_extra" for f in FAMILIES]].gt(0).sum(axis=1)
     briefs["repeat_label"] = np.select([briefs.positive_families >= 3, briefs.positive_families == 2], ["Yes", "Mostly"], default="No")
     keep = [
-        "player_id", "player_name", "attempts", "test_attempts", "seasons_reviewed", "extra_makes_per_100", "lower_80", "upper_80", "confidence", "bottom_line", "positive_families", "repeat_label", "role", "role_description", "strongest_evidence",
+        "player_id", "player_name", "team_id", "team_name", "position", "attempts", "test_attempts", "seasons_reviewed", "extra_makes_per_100", "lower_80", "upper_80", "confidence", "bottom_line", "positive_families", "repeat_label", "role", "role_description", "strongest_evidence",
         *[f"{FAMILY_SLUG[f]}_extra" for f in FAMILIES],
         *[f"{FAMILY_SLUG[f]}_attempts" for f in FAMILIES],
     ]
@@ -158,6 +167,6 @@ def export_app_bundle(
     briefs.to_parquet(app_dir / "player_briefs.parquet", index=False)
     (app_dir / "validation_summary.json").write_text(json.dumps(metrics, indent=2) + "\n")
     (app_dir / "monitoring.json").write_text(json.dumps(monitoring, indent=2) + "\n")
-    metadata = {"model_version": metrics["model_version"], "created_at": metrics["created_at"], "qualified_players": int(len(briefs)), "minimum_test_attempts": MIN_TEST_ATTEMPTS, "runtime_network_calls": False}
+    metadata = {"model_version": metrics["model_version"], "created_at": metrics["created_at"], "qualified_players": int(len(briefs)), "minimum_test_attempts": MIN_TEST_ATTEMPTS, "evaluation_season": TEST_SEASON, "supporting_season": metrics["seasons"]["validation"], "runtime_network_calls": False}
     (app_dir / "model_metadata.json").write_text(json.dumps(metadata, indent=2) + "\n")
     return briefs, monitoring

@@ -8,23 +8,26 @@ from shotfit.evaluation import export_app_bundle
 from shotfit.features import build_database
 from shotfit.ingest import ingest_all
 from shotfit.modeling import train_and_score
+from shotfit.rosters import fetch_player_positions
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(prog="shotfit")
-    parser.add_argument("command", choices=("ingest", "build-features", "train", "export-app", "all"))
+    parser.add_argument("command", choices=("ingest", "build-features", "train", "fetch-rosters", "export-app", "all"))
     parser.add_argument("--refresh", action="store_true")
     args = parser.parse_args()
     if args.command in ("ingest", "all"):
         ingest_all(refresh=args.refresh)
+        fetch_player_positions()
     if args.command in ("build-features", "all"):
         build_database()
     if args.command in ("train", "all"):
         train_and_score()
+    if args.command == "fetch-rosters":
+        fetch_player_positions()
     if args.command in ("export-app", "all"):
         export_app_bundle()
 
 
 if __name__ == "__main__":
     main()
-

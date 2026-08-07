@@ -51,13 +51,26 @@ def load_data():
 
 briefs, metrics, monitoring, metadata = load_data()
 st.markdown("### SHOTFIT")
-st.caption("Shooting translation brief · public NBA data")
+st.caption("Shooting translation brief · 2024–25 NBA regular season evaluation")
 
 brief_tab, model_tab = st.tabs(["Basketball Brief", "Model & Validation"])
 
 with brief_tab:
-    player = st.selectbox("Player", sorted(briefs.player_name), index=0)
+    st.info(
+        "Player estimates use 2023–24 validation and 2024–25 evaluation shots. "
+        "Public eligibility and the team shown below are based on the 2024–25 regular season."
+    )
+    filter_team, filter_position, filter_player = st.columns([1.2, 1, 1.5])
+    with filter_team:
+        team = st.selectbox("Team (2024–25)", ["All teams", *sorted(briefs.team_name.unique())])
+    team_pool = briefs if team == "All teams" else briefs[briefs.team_name == team]
+    with filter_position:
+        position = st.selectbox("Position", ["All positions", *sorted(team_pool.position.unique())])
+    player_pool = team_pool if position == "All positions" else team_pool[team_pool.position == position]
+    with filter_player:
+        player = st.selectbox("Player", sorted(player_pool.player_name), index=0)
     row = briefs.loc[briefs.player_name == player].iloc[0]
+    st.caption(f"{row.team_name} · {row.position} · 2024–25 evaluation season")
     st.markdown('<div class="shotfit-kicker">Bottom line</div>', unsafe_allow_html=True)
     st.header(row.bottom_line)
     st.markdown(

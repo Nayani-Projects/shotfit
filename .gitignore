@@ -8,6 +8,6 @@ __pycache__/
 data/raw/
 data/database/
 data/processed/
+data/reference/
 artifacts/*.joblib
 .DS_Store
-
