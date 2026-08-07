@@ -1,4 +1,4 @@
-# ShotFit: 2025–26 Shot-Making Evidence Board
+# ShotFit: 2025–26 Player Shooting Review
 
 ShotFit asks one descriptive question:
 
@@ -35,9 +35,8 @@ The 250-attempt standard was chosen before applying labels to 2025–26. On 2024
 
 ## App structure
 
-- **Evidence Board:** filter and compare all qualified players.
-- **Player Brief:** inspect the adjusted estimate, range, shot distribution, court map, area evidence, and review flags.
-- **Model & Validation:** audit model quality, calibration, threshold selection, interval sensitivity, and limitations.
+- **Player Review:** choose a player, read the result, inspect the court and shot areas, and prepare a focused film review.
+- **Methodology:** audit model quality, calibration, threshold selection, interval sensitivity, and limitations.
 
 ## Repository map
 

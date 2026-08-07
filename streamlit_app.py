@@ -19,12 +19,24 @@ st.markdown(
     """
     <style>
     .block-container {max-width: 1120px; padding-top: 1.5rem;}
+    .stApp {background: #F7F7F5; color: #172033;}
     [data-testid="stMetric"] {background: white; border: 1px solid #e7eaf0; padding: 1rem; border-radius: .8rem;}
     [data-testid="stMetricLabel"] {color: #687386;}
     .shotfit-kicker {text-transform: uppercase; letter-spacing: .12em; color: #687386; font-size: .78rem;}
     .shotfit-lead {font-size: 1.12rem; max-width: 820px; color: #364153;}
     .shotfit-intro {background: #f4f7fb; border-left: 4px solid #1d428a; border-radius: .55rem; padding: 1rem 1.15rem; margin-bottom: 1.2rem; color: #293548;}
     .shotfit-intro b {font-size: 1.05rem;}
+    .shotfit-result {border-left: 4px solid #4678B8; padding: .25rem 0 .25rem 1rem; margin: .75rem 0 1.25rem;}
+    .shotfit-result.neutral {border-left-color: #A8AFB8;}
+    .shotfit-result.negative {border-left-color: #B55D42;}
+    .shotfit-result-label {font-size: .8rem; font-weight: 600; color: #667085; margin-bottom: .25rem;}
+    .shotfit-result-name {font-size: 2rem; font-weight: 600; color: #172033; margin-bottom: .35rem;}
+    .shotfit-result-copy {font-size: 1.08rem; max-width: 780px; color: #364153;}
+    .shotfit-review-box {background: #F2F5F8; padding: 1rem 1.2rem; border-radius: .55rem; margin-top: 1rem;}
+    .shotfit-area-row {border-top: 1px solid #E2E5E9; padding: .8rem 0;}
+    .shotfit-area-row:last-child {border-bottom: 1px solid #E2E5E9;}
+    .shotfit-area-name {font-weight: 600; color: #172033;}
+    .shotfit-area-note {color: #667085;}
     .shotfit-footer {border-top: 1px solid #e7eaf0; margin-top: 2rem; padding-top: 1rem; color: #687386; font-size: .82rem;}
     </style>
     """,
@@ -78,164 +90,173 @@ st.markdown(
     "after accounting for where and how they shot?"
 )
 
-board_tab, brief_tab, model_tab = st.tabs(["Evidence Board", "Player Brief", "Model & Validation"])
+review_tab, model_tab = st.tabs(["Player Review", "Methodology"])
 
-with board_tab:
-    st.header("Players worth a closer look")
-    st.markdown(
-        f'<div class="shotfit-intro"><b>Find unusual shooting results from the {evaluation_season} season.</b><br>'
-        "ShotFit compares each player's makes with what an average NBA shooter would be expected to make from the same shot locations, shot types, and game situations.</div>",
-        unsafe_allow_html=True,
-    )
-    st.caption("This is a starting point for review, not a player ranking. Use it to decide where film, tracking data, and scouting context are needed.")
-    positive_count = int(briefs.evidence_label.eq("Strong positive evidence").sum())
-    inconclusive_count = int(briefs.evidence_label.eq("Inconclusive evidence").sum())
-    negative_count = int(briefs.evidence_label.eq("Strong negative evidence").sum())
-    p1, p2, p3 = st.columns(3)
-    p1.metric("Worth reviewing", positive_count, "Above expectation")
-    p2.metric("No clear signal", inconclusive_count, "Could be normal variation")
-    p3.metric("Potential concern", negative_count, "Below expectation")
+result_options = {
+    "All results": None,
+    "Worth reviewing": "Strong positive evidence",
+    "No clear signal": "Inconclusive evidence",
+    "Potential concern": "Strong negative evidence",
+}
+public_result = {
+    "Strong positive evidence": "Outperformed expectations",
+    "Inconclusive evidence": "No clear difference",
+    "Strong negative evidence": "Underperformed expectations",
+}
+result_class = {
+    "Strong positive evidence": "",
+    "Inconclusive evidence": "neutral",
+    "Strong negative evidence": "negative",
+}
 
-    with st.expander("What do these groups mean?"):
-        st.markdown(
-            "- **Worth reviewing:** shooting results were clearly above what the shot difficulty model expected.\n"
-            "- **No clear signal:** the available shots do not clearly separate performance from normal shooting variation.\n"
-            "- **Potential concern:** shooting results were clearly below what the model expected.\n\n"
-            "These groups describe shooting results, not overall player quality or future performance."
-        )
 
-    f1, f2, f3, f4 = st.columns(4)
-    with f1:
-        board_team = st.selectbox("Team", ["All teams", *sorted(briefs.team_name.unique())], key="board_team")
-    with f2:
-        board_position = st.selectbox("Position", ["All positions", *sorted(briefs.position.unique())], key="board_position")
-    with f3:
-        result_options = {
-            "All results": None,
-            "Outperformed expectations": "Strong positive evidence",
-            "No clear difference": "Inconclusive evidence",
-            "Underperformed expectations": "Strong negative evidence",
-        }
-        board_result = st.selectbox("Shooting result", list(result_options), key="board_result")
-    with f4:
-        board_profile = st.selectbox("Shot profile", ["All profiles", *sorted(briefs.shot_profile.unique())], key="board_profile")
-    sort_options = {
-        "Strongest evidence": ("lower_80", False),
-        "Most shots reviewed": ("attempts", False),
-        "Player name": ("player_name", True),
-        "Team": ("team_name", True),
-    }
-    board_minimum = 250
-    with st.expander("More filters"):
-        extra1, extra2 = st.columns(2)
-        with extra1:
-            board_minimum = st.select_slider("Minimum shots reviewed", options=[250, 400, 600, 800, 1000], value=250)
-        with extra2:
-            board_sort = st.selectbox("Sort by", list(sort_options), key="board_sort")
-    board = briefs[briefs.attempts >= board_minimum].copy()
-    if board_team != "All teams":
-        board = board[board.team_name == board_team]
-    if board_position != "All positions":
-        board = board[board.position == board_position]
-    if result_options[board_result] is not None:
-        board = board[board.evidence_label == result_options[board_result]]
-    if board_profile != "All profiles":
-        board = board[board.shot_profile == board_profile]
-    sort_column, sort_ascending = sort_options[board_sort]
-    board = board.sort_values(sort_column, ascending=sort_ascending)
-    public_result = {
-        "Strong positive evidence": "Worth reviewing",
-        "Inconclusive evidence": "No clear signal",
-        "Strong negative evidence": "Potential concern",
-    }
-    def board_reason(row):
-        if row.evidence_label == "Inconclusive evidence":
-            return f"No clear difference across {int(row.attempts):,} shots"
-        direction = "Above" if row.evidence_label == "Strong positive evidence" else "Below"
-        if row.strongest_supported_area != "No area with conclusive positive evidence":
-            return f"{direction} expectation; strongest support from {row.strongest_supported_area.lower()}"
-        return f"{direction} expectation on a {row.shot_profile.lower()} profile"
-    board_display = board.assign(
-        result=board.evidence_label.map(public_result),
-        reason=board.apply(board_reason, axis=1),
-    )[["player_name", "team_name", "position", "reason", "attempts", "result"]]
-    board_display.columns = ["Player", "Team", "Position", "Why the player surfaced", "Shots reviewed", "Review group"]
-    st.dataframe(board_display, hide_index=True, width="stretch", height=500)
-    st.caption(f"Showing {len(board_display):,} of {len(briefs):,} qualified players. Choose a player in Player Brief to see the full evidence trail and likely shooting range.")
+def area_status(area):
+    if area.evidence_label == "Strong positive evidence":
+        return "Above expectation"
+    if area.evidence_label == "Strong negative evidence":
+        return "Below expectation"
+    return "Near expectation"
 
-with brief_tab:
-    st.header("Player Brief")
-    st.caption(f"Results from the {evaluation_season} regular season. This is not a forecast or personnel grade.")
-    filter_team, filter_position, filter_player = st.columns([1.2, 1, 1.5])
+
+def area_note(area, main_area):
+    if area.shot_area == main_area:
+        return "Main source of the result"
+    if area.evidence_label == "Strong negative evidence":
+        return "Check this area on film"
+    if area.evidence_label == "Strong positive evidence":
+        return "Also contributed to the result"
+    return "No unusual difference"
+
+
+with review_tab:
+    st.header("Player review")
+    st.caption("Select a player to see what happened, where it happened, and what to check on film.")
+    filter_team, filter_position, filter_result, filter_player = st.columns([1.15, 1, 1.25, 1.5])
     with filter_team:
         team = st.selectbox("Team", ["All teams", *sorted(briefs.team_name.unique())], key="brief_team")
     team_pool = briefs if team == "All teams" else briefs[briefs.team_name == team]
     with filter_position:
         position = st.selectbox("Position", ["All positions", *sorted(team_pool.position.unique())], key="brief_position")
-    player_pool = team_pool if position == "All positions" else team_pool[team_pool.position == position]
+    position_pool = team_pool if position == "All positions" else team_pool[team_pool.position == position]
+    with filter_result:
+        available_results = {
+            label: internal
+            for label, internal in result_options.items()
+            if internal is None or position_pool.evidence_label.eq(internal).any()
+        }
+        shooting_result = st.selectbox("Shooting result", list(available_results), index=0, key="brief_result")
+    player_pool = position_pool
+    if available_results[shooting_result] is not None:
+        player_pool = player_pool[player_pool.evidence_label == available_results[shooting_result]]
+    player_pool = player_pool.sort_values("lower_80", ascending=False)
     with filter_player:
-        player = st.selectbox("Player", sorted(player_pool.player_name), key="brief_player")
+        player = st.selectbox("Player", player_pool.player_name.tolist(), key="brief_player")
+    st.caption(f"{len(player_pool):,} players match these filters.")
+    with st.expander("Browse matching players"):
+        browse = player_pool[["player_name", "team_name", "position", "attempts"]].copy()
+        browse.columns = ["Player", "Team", "Position", "Shots reviewed"]
+        st.dataframe(browse, hide_index=True, width="stretch", height=260)
+
     row = briefs.loc[briefs.player_name == player].iloc[0]
     direction = f"{row.extra_makes_per_100:.1f} more" if row.extra_makes_per_100 >= 0 else f"{abs(row.extra_makes_per_100):.1f} fewer"
-    st.caption(f"{row.team_name} · {row.position} · {evaluation_season} regular season")
-    st.markdown('<div class="shotfit-kicker">Evidence summary</div>', unsafe_allow_html=True)
-    brief_result = {
-        "Strong positive evidence": "Outperformed expectations",
-        "Inconclusive evidence": "No clear difference",
-        "Strong negative evidence": "Underperformed expectations",
-    }[row.evidence_label]
-    st.header(brief_result)
+    player_areas = areas[areas.player_id == row.player_id].copy().sort_values("attempts", ascending=False)
+    review_area = player_areas.iloc[0].shot_area
+    if row.evidence_label == "Strong positive evidence":
+        main_area = row.strongest_supported_area
+        result_sentence = f"Most of the difference came from {main_area.lower()} shooting."
+    elif row.evidence_label == "Strong negative evidence":
+        negative_areas = player_areas[player_areas.evidence_label == "Strong negative evidence"]
+        main_area = (negative_areas if not negative_areas.empty else player_areas).sort_values("extra_makes_per_100").iloc[0].shot_area
+        result_sentence = f"The largest shortfall came from {main_area.lower()} shooting."
+    else:
+        main_area = "No clear area"
+        result_sentence = "The difference was not large enough to separate from normal shooting variation."
+    review_area = main_area if main_area != "No clear area" else review_area
+    main_copy = review_area.lower()
     st.markdown(
-        f'<div class="shotfit-lead">{row.player_name} made about <b>{direction} shots per 100 attempts</b> than expected based on shot location, shot type, and game situation. The likely range was <b>{row.lower_80:+.1f} to {row.upper_80:+.1f}</b>.</div>',
+        f'<div class="shotfit-result {result_class[row.evidence_label]}">'
+        f'<div class="shotfit-result-label">{public_result[row.evidence_label]}</div>'
+        f'<div class="shotfit-result-name">{row.player_name}</div>'
+        f'<div class="shotfit-result-copy">{row.player_name} made about <b>{direction} shots per 100 attempts</b> than expected. '
+        f'{result_sentence}</div></div>',
         unsafe_allow_html=True,
     )
     m1, m2, m3 = st.columns(3)
     m1.metric("Shooting difference", f"{row.extra_makes_per_100:+.1f}", "makes per 100 shots")
-    m2.metric("Likely range", f"{row.lower_80:+.1f} to {row.upper_80:+.1f}")
-    m3.metric("Shots reviewed", f"{int(row.attempts):,}", evaluation_season)
-    a1, a2, a3 = st.columns(3)
-    a1.metric("Actual makes", f"{int(row.actual_makes):,}")
-    a2.metric("Expected makes", f"{row.expected_makes:,.1f}")
-    a3.metric("Adjusted extra makes", f"{row.adjusted_extra_makes:+.1f}", "total")
-
-    st.subheader("Shot distribution")
-    st.markdown(f"**{row.shot_profile}** · {row.profile_statement}")
-    distribution = pd.DataFrame(
-        {
-            "Area": ["Rim", "Midrange", "Three-point"],
-            "Share of shots": [row.rim_share, row.midrange_share, row.three_share],
-            "Position percentile": [row.rim_percentile, row.midrange_percentile, row.three_percentile],
-        }
-    )
-    st.dataframe(distribution.style.format({"Share of shots": "{:.1%}", "Position percentile": "{:.0%}"}), hide_index=True, width="stretch")
+    m2.metric("Shots reviewed", f"{int(row.attempts):,}", evaluation_season)
+    m3.metric("Main source", main_area, "shot area")
 
     st.subheader("Where the result came from")
-    st.caption("Hex size shows shot volume. Blue locations finished above expectation; rust locations finished below expectation.")
+    st.caption("Larger markers represent more shots. Blue areas finished above expectation. Orange areas finished below expectation.")
     player_bins = hex_bins[hex_bins.player_id == row.player_id]
-    st.plotly_chart(shot_translation_court(player_bins), width="stretch", config={"displayModeBar": False})
-    player_areas = areas[areas.player_id == row.player_id].copy().sort_values("attempts", ascending=False)
-    area_display = player_areas.assign(
-        range_80=player_areas.apply(lambda area: f"{area.lower_80:+.1f} to {area.upper_80:+.1f}", axis=1),
-        adjusted=player_areas.extra_makes_per_100.map(lambda value: f"{value:+.1f}"),
-    )[["shot_area", "attempts", "shot_share", "position_frequency_percentile", "actual_makes", "expected_makes", "adjusted", "range_80", "evidence_label"]]
-    area_display.columns = ["Shot area", "Attempts", "Shot share", "Position frequency percentile", "Actual makes", "Expected makes", "Adjusted extra/100", "80% range", "Evidence"]
-    st.dataframe(area_display.style.format({"Shot share": "{:.1%}", "Position frequency percentile": "{:.0%}", "Actual makes": "{:.0f}", "Expected makes": "{:.1f}"}), hide_index=True, width="stretch")
-    if row.strongest_supported_area != "No area with conclusive positive evidence":
-        st.success(f"Strongest supported area: {row.strongest_supported_area}.")
+    court_col, note_col = st.columns([1.7, 0.8])
+    with court_col:
+        st.plotly_chart(shot_translation_court(player_bins), width="stretch", config={"displayModeBar": False})
+    with note_col:
+        st.markdown("#### What stands out")
+        if row.evidence_label == "Inconclusive evidence":
+            st.markdown(
+                "- No shot area showed a clear difference from expectation.\n"
+                f"- {review_area} accounted for the largest share of attempts.\n"
+                f"- {int(row.attempts):,} shots provide the sample for this review."
+            )
+        else:
+            st.markdown(
+                f"- {main_area} was the main source of the result.\n"
+                f"- {row.shot_profile.replace('-heavy', '').title()} shots made up the largest relative part of his shot mix.\n"
+                f"- {int(row.attempts):,} shots provide the sample for this review."
+            )
+
+    st.subheader("Results by shot area")
+    for area in player_areas.itertuples():
+        st.markdown(
+            f'<div class="shotfit-area-row"><span class="shotfit-area-name">{area.shot_area}</span> &nbsp; '
+            f'{int(area.attempts):,} shots &nbsp; <b>{area_status(area)}</b><br>'
+            f'<span class="shotfit-area-note">{area_note(area, main_area)}</span></div>',
+            unsafe_allow_html=True,
+        )
+
+    st.subheader("Shot mix")
+    if row.shot_profile == "Balanced":
+        st.write(f"{row.player_name}'s shot mix was typical for a {row.position.lower()}.")
     else:
-        st.info(row.strongest_supported_area + ".")
-    if row.review_flag != "No high-volume area had strong negative evidence.":
-        st.warning("Review flag: " + row.review_flag)
-    else:
-        st.caption(row.review_flag)
-    with st.expander("Limits of this evidence"):
+        mix_name = row.shot_profile.replace("-heavy", "").lower()
+        st.write(f"{row.player_name} took a larger share of his shots from {mix_name} areas than most {row.position.lower()}s.")
+    mix_rows = [
+        ("At the rim", row.rim_share, row.rim_percentile),
+        ("Midrange", row.midrange_share, row.midrange_percentile),
+        ("Three-point", row.three_share, row.three_percentile),
+    ]
+    for label, share, percentile in mix_rows:
+        label_col, bar_col, note_col = st.columns([1, 3, 1.4])
+        label_col.write(f"**{label}**  {share:.0%}")
+        bar_col.progress(float(share))
+        comparison = "Very high" if percentile >= 0.75 else "Low" if percentile <= 0.25 else "Typical"
+        note_col.caption(f"{comparison} for a {row.position.lower()}")
+
+    st.markdown('<div class="shotfit-review-box">', unsafe_allow_html=True)
+    st.subheader("What to check on film")
+    st.markdown(
+        f"- What types of {main_copy} attempts produced the result?\n"
+        "- How often was the closest defender late or absent?\n"
+        "- Did the player's balance and shot preparation hold against tighter contests?"
+    )
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    with st.expander("View calculations"):
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Actual makes", f"{int(row.actual_makes):,}")
+        c2.metric("Expected makes", f"{row.expected_makes:,.1f}")
+        c3.metric("Likely range", f"{row.lower_80:+.1f} to {row.upper_80:+.1f}")
+        st.caption("The range and shooting difference account for sample size. Lower-volume results are pulled closer to zero.")
+    with st.expander("Data limitations"):
         st.write(
             "Public shot records do not include shot-level defender distance, pass quality, movement, balance, screen quality, play design, health, or internal role information. "
-            "The estimates describe shot-making relative to observable context in this sample; they do not establish future performance, team fit, or what shots a player should take."
+            "The results describe this season. They do not establish future performance, team fit, or what shots a player should take."
         )
 
 with model_tab:
-    st.header("Model & Validation")
+    st.header("Methodology")
     st.subheader("Decision question")
     st.write(
         f"Which players produced the strongest evidence of shot-making above or below expectation in {evaluation_season}, and where did the difference originate?"
