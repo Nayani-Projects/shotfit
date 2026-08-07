@@ -1,4 +1,4 @@
-# ShotFit — 2025–26 Shot-Making Evidence Board
+# ShotFit: 2025–26 Shot-Making Evidence Board
 
 ShotFit asks one descriptive question:
 

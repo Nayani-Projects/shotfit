@@ -84,10 +84,10 @@ with board_tab:
     st.header("Players worth a closer look")
     st.markdown(
         f'<div class="shotfit-intro"><b>Find unusual shooting results from the {evaluation_season} season.</b><br>'
-        "ShotFit compares each player's makes with what an average NBA shooter would be expected to make from the same observable shot locations and situations.</div>",
+        "ShotFit compares each player's makes with what an average NBA shooter would be expected to make from the same shot locations, shot types, and game situations.</div>",
         unsafe_allow_html=True,
     )
-    st.caption("This is a screening tool—not a player ranking. Use it to identify results that deserve film, tracking, and scouting review.")
+    st.caption("This is a starting point for review, not a player ranking. Use it to decide where film, tracking data, and scouting context are needed.")
     positive_count = int(briefs.evidence_label.eq("Strong positive evidence").sum())
     inconclusive_count = int(briefs.evidence_label.eq("Inconclusive evidence").sum())
     negative_count = int(briefs.evidence_label.eq("Strong negative evidence").sum())
@@ -165,7 +165,7 @@ with board_tab:
 
 with brief_tab:
     st.header("Player Brief")
-    st.caption(f"Descriptive evidence from {evaluation_season} only—not a forecast, role recommendation, or acquisition grade.")
+    st.caption(f"Results from the {evaluation_season} regular season. This is not a forecast or personnel grade.")
     filter_team, filter_position, filter_player = st.columns([1.2, 1, 1.5])
     with filter_team:
         team = st.selectbox("Team", ["All teams", *sorted(briefs.team_name.unique())], key="brief_team")
@@ -179,14 +179,19 @@ with brief_tab:
     direction = f"{row.extra_makes_per_100:.1f} more" if row.extra_makes_per_100 >= 0 else f"{abs(row.extra_makes_per_100):.1f} fewer"
     st.caption(f"{row.team_name} · {row.position} · {evaluation_season} regular season")
     st.markdown('<div class="shotfit-kicker">Evidence summary</div>', unsafe_allow_html=True)
-    st.header(row.evidence_label)
+    brief_result = {
+        "Strong positive evidence": "Outperformed expectations",
+        "Inconclusive evidence": "No clear difference",
+        "Strong negative evidence": "Underperformed expectations",
+    }[row.evidence_label]
+    st.header(brief_result)
     st.markdown(
-        f'<div class="shotfit-lead">{row.player_name} made an adjusted <b>{direction} shots per 100 attempts</b> than expected from his observable {evaluation_season} shot profile. His 80% range was <b>{row.lower_80:+.1f} to {row.upper_80:+.1f}</b>.</div>',
+        f'<div class="shotfit-lead">{row.player_name} made about <b>{direction} shots per 100 attempts</b> than expected based on shot location, shot type, and game situation. The likely range was <b>{row.lower_80:+.1f} to {row.upper_80:+.1f}</b>.</div>',
         unsafe_allow_html=True,
     )
     m1, m2, m3 = st.columns(3)
-    m1.metric("Adjusted extra makes", f"{row.extra_makes_per_100:+.1f}", "per 100 shots")
-    m2.metric("80% adjusted range", f"{row.lower_80:+.1f} to {row.upper_80:+.1f}")
+    m1.metric("Shooting difference", f"{row.extra_makes_per_100:+.1f}", "makes per 100 shots")
+    m2.metric("Likely range", f"{row.lower_80:+.1f} to {row.upper_80:+.1f}")
     m3.metric("Shots reviewed", f"{int(row.attempts):,}", evaluation_season)
     a1, a2, a3 = st.columns(3)
     a1.metric("Actual makes", f"{int(row.actual_makes):,}")
@@ -281,4 +286,4 @@ with model_tab:
     st.code("nba_api → gzip raw cache → DuckDB → features → model → batch evidence → app", language=None)
     st.caption("The public app loads only precomputed Parquet and JSON files and makes no runtime NBA.com requests.")
 
-st.markdown('<div class="shotfit-footer">Descriptive evidence for film and tracking review · Not a forecast, role recommendation, or personnel grade</div>', unsafe_allow_html=True)
+st.markdown('<div class="shotfit-footer">A starting point for film and tracking review. Not a forecast, role recommendation, or personnel grade.</div>', unsafe_allow_html=True)
